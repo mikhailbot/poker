@@ -256,10 +256,14 @@ input:focus-visible {
 }
 .timer {
   position: absolute;
-  inset: -5px;
-  width: 50px;
-  height: 50px;
+  left: -5px;
+  top: -5px;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
   transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  overflow: visible;
+  pointer-events: none;
 }
 .timer circle {
   fill: none;
@@ -650,17 +654,59 @@ input:focus-visible {
 }
 .odds {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
+  padding-inline: 4px;
   font-size: 13px;
   color: var(--muted);
-  padding-inline: 4px;
 }
-.odds-pct {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
+.odds-line {
+  margin: 0;
+  line-height: 1.35;
+}
+.odds b,
+.chance b {
   color: var(--ink);
+  font-weight: 700;
+}
+.chance {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chance-text {
+  white-space: nowrap;
+}
+/* Your chance as a filled bar; the tick marks what you need to call */
+.meter {
+  position: relative;
+  flex: 1;
+  min-width: 60px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+.meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 200ms;
+}
+.meter-fill.ok {
+  background: var(--up);
+}
+.meter-fill.short {
+  background: var(--down);
+}
+.meter-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--ink);
 }
 .buttons {
   display: grid;
@@ -1120,4 +1166,34 @@ input:focus-visible {
   to {
     transform: scaleX(1);
   }
+}
+
+/* Showdown: the hands that lost, under the winner */
+.losers {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 6px 10px 0;
+  border-top: 1px solid var(--stage-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.losers li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.85;
+}
+.loser-name {
+  font-weight: 600;
+  min-width: 52px;
+  text-align: right;
+}
+.loser-cards {
+  display: flex;
+  gap: 1px;
+}
+.mini-cards.mucked {
+  opacity: 0.5;
 }

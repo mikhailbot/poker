@@ -1,13 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
+import { beliefFor } from '../bots/brain';
+import { equityVsRanges } from '../bots/equity';
+import type { PlayerStats } from '../bots/stats';
 import { type Decision, type HandState, legalActions, potTotal } from '../engine/game';
 
 interface Props {
   hand: HandState;
+  stats: PlayerStats[];
   showOdds: boolean;
+  showChance: boolean;
   onAct: (d: Decision) => void;
 }
 
-export function ActionBar({ hand: h, showOdds, onAct }: Props) {
+/** Your chance of winning against the hands opponents are likely to hold, given how they've played. */
+function estimateChance(h: HandState, stats: PlayerStats[]): number {
+  const me = h.players[h.toAct];
+  const opps = h.players.filter((p) => p.seat !== me.seat && !p.folded && !p.sittingOut);
+  const beliefs = opps.map((o) => beliefFor(h, o.seat, stats));
+  return equityVsRanges(me.hole, h.board, beliefs, h.variant === 'plo' ? 300 : 900, h.variant);
+}
+
+export function ActionBar({ hand: h, stats, showOdds, showChance, onAct }: Props) {
   const la = legalActions(h);
   const me = h.players[h.toAct];
   const pot = potTotal(h);
@@ -57,19 +70,39 @@ export function ActionBar({ hand: h, showOdds, onAct }: Props) {
   }, [h.actions.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const potOdds = la.callAmount > 0 ? la.callAmount / (pot + la.callAmount) : 0;
+  const chance = useMemo(
+    () => (showChance ? estimateChance(h, stats) : null),
+    // recompute when the situation changes, not on every render
+    [showChance, h.handId, h.actions.length], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const needPct = Math.round(potOdds * 100);
+  const chancePct = chance === null ? null : Math.round(chance * 100);
+  const opponents = h.players.filter((p) => !p.isHuman && !p.folded).length;
   const raiseWord = la.isBet ? 'Bet' : 'Raise to';
   const allIn = amount >= me.bet + me.stack;
 
   return (
     <div className="actionbar">
-      {showOdds && la.callAmount > 0 && (
+      {(showOdds && la.callAmount > 0) || chancePct !== null ? (
         <div className="odds">
-          <span className="odds-pct">{Math.round(potOdds * 100)}%</span>
-          <span>
-            equity needed to call {la.callAmount} into a pot of {pot}
-          </span>
+          {showOdds && la.callAmount > 0 && (
+            <p className="odds-line">
+              Calling {la.callAmount} to win {pot} pays off if you win at least <b>{needPct}%</b> of the time.
+            </p>
+          )}
+          {chancePct !== null && (
+            <div className="chance">
+              <div className="meter" role="img" aria-label={`Your chance about ${chancePct}%, needed ${needPct}%`}>
+                <span className={`meter-fill ${la.callAmount > 0 ? (chancePct >= needPct ? 'ok' : 'short') : ''}`} style={{ width: `${chancePct}%` }} />
+                {la.callAmount > 0 && showOdds && <span className="meter-mark" style={{ left: `${needPct}%` }} />}
+              </div>
+              <span className="chance-text">
+                You win about <b>{chancePct}%</b> vs {opponents === 1 ? '1 player' : `${opponents} players`}
+              </span>
+            </div>
+          )}
         </div>
-      )}
+      ) : null}
 
       {sizing && la.canRaise && (
         <div className="sizer">

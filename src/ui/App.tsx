@@ -10,7 +10,9 @@ import {
   DEFAULT_SETTINGS,
   rebuyHuman,
   runOut,
+  TABLES,
   type Session,
+  type TableKind,
 } from '../session';
 import {
   appendHistory,
@@ -124,11 +126,12 @@ export function App() {
     savePrefs(p);
   };
 
-  const newSession = (lineup: 'default' | 'random', game: Variant = variant) => {
+  const newSession = (table: TableKind = s.settings.table ?? 'lively', game: Variant = variant) => {
     sessionRef.current = createSession({
       ...DEFAULT_SETTINGS,
       variant: game,
-      lineup: lineup === 'random' ? 'random' : DEFAULT_SETTINGS.lineup,
+      table,
+      lineup: table === 'random' ? 'random' : TABLES[table],
     });
     saveSession(sessionRef.current);
     setPanel(null);
@@ -167,11 +170,11 @@ export function App() {
       </header>
 
       <main className="main">
-        <Table session={s} revealStyles={prefs.revealStyles} thinking={thinking} />
+        <Table session={s} revealStyles={prefs.revealStyles} revealMucked={prefs.revealMucked} thinking={thinking} />
       </main>
 
       <footer className="dock">
-        {heroTurn && h && <ActionBar hand={h} showOdds={prefs.showOdds} onAct={onAct} />}
+        {heroTurn && h && <ActionBar hand={h} stats={s.stats} showOdds={prefs.showOdds} showChance={prefs.showChance} onAct={onAct} />}
 
         {h && !h.done && !heroTurn && heroFolded && (
           <div className="dock-row">
@@ -237,6 +240,7 @@ export function App() {
         <SettingsSheet
           prefs={prefs}
           variant={variant}
+          table={s.settings.table ?? 'mixed'}
           onPrefs={updatePrefs}
           onNewSession={newSession}
           onClose={() => setPanel(null)}

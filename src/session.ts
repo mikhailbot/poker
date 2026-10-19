@@ -23,14 +23,25 @@ export interface Settings {
   buyInBB: number;
   /** Table line-up: profile ids for the five bots, or 'random'. */
   lineup: string[] | 'random';
+  /** Which preset line-up this is, for the settings screen. */
+  table?: TableKind;
 }
+
+/** Table line-ups: which five personalities sit with you. */
+export const TABLES = {
+  lively: ['rec', 'station', 'lag', 'tag', 'maniac'],
+  mixed: ['nit', 'tag', 'lag', 'station', 'maniac'],
+  tough: ['tag', 'tag', 'lag', 'lag', 'nit'],
+} satisfies Record<string, string[]>;
+export type TableKind = keyof typeof TABLES | 'random';
 
 export const DEFAULT_SETTINGS: Settings = {
   variant: 'holdem',
   smallBlind: 1,
   bigBlind: 2,
   buyInBB: 100,
-  lineup: ['nit', 'tag', 'lag', 'station', 'maniac'],
+  lineup: TABLES.lively,
+  table: 'lively',
 };
 
 export interface Session {

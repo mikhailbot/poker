@@ -143,7 +143,7 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
     if (la.canRaise && hp > valueLine && hp < valueLine + 0.18 && isBluffable3bet(me.hole) && r() < p.bluff * 0.6)
       return raiseTo(h.currentBet * 3.2, '3-bet bluff');
 
-    let callPct = Math.min(playPct * 0.75, raiserRange * 1.3);
+    let callPct = Math.min(playPct * 0.85, raiserRange * 1.4);
     callPct *= clamp(3 / sizeBB, 0.45, 1.2); // bigger opens -> tighter
     if (pos === 'BB') callPct *= 1.7; // getting a price
     if (callers > 0) callPct *= 1.1; // multiway implied odds

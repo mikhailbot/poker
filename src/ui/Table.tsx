@@ -27,16 +27,18 @@ function streetAction(h: HandState, seat: number) {
 interface Props {
   session: Session;
   revealStyles: boolean;
+  /** Show folded players' cards once the hand is over. */
+  revealMucked: boolean;
   /** Current bot think time in ms (drives the timer ring), 0 when idle. */
   thinking: number;
 }
 
-export function Table({ session, revealStyles, thinking }: Props) {
+export function Table({ session, revealStyles, revealMucked, thinking }: Props) {
   const h = session.hand;
   if (!h) return null;
   return (
     <div className={`table ${h.variant === 'plo' ? 'is-plo' : ''}`}>
-      <Opponents h={h} session={session} revealStyles={revealStyles} thinking={thinking} />
+      <Opponents h={h} session={session} revealStyles={revealStyles} revealMucked={revealMucked} thinking={thinking} />
       <Stage h={h} />
       <Hero h={h} />
     </div>
@@ -45,7 +47,7 @@ export function Table({ session, revealStyles, thinking }: Props) {
 
 // ------------------------------------------------------------ opponents
 
-function Opponents({ h, session, revealStyles, thinking }: { h: HandState } & Props) {
+function Opponents({ h, session, revealStyles, revealMucked, thinking }: { h: HandState } & Props) {
   const winners = new Set(h.done ? h.pots.filter((p) => p.eligible.length > 1 || h.pots.length === 1).flatMap((p) => p.winners) : []);
   const shown = new Set(h.showdown.map((s) => s.seat));
   return (
@@ -56,6 +58,7 @@ function Opponents({ h, session, revealStyles, thinking }: { h: HandState } & Pr
         const act = streetAction(h, i);
         const active = !h.done && h.toAct === i;
         const reveal = h.done && shown.has(i);
+        const mucked = h.done && !reveal && revealMucked && p.hole.length > 0;
         const cls = ['opp', `hue-${i}`, active && 'active', p.folded && 'folded', winners.has(i) && 'winner'].filter(Boolean).join(' ');
         return (
           <li key={i} className={cls}>
@@ -72,8 +75,8 @@ function Opponents({ h, session, revealStyles, thinking }: { h: HandState } & Pr
             <div className="opp-stack">{p.stack === 0 && p.allIn ? 'All-in' : p.stack}</div>
             <div className="opp-pos">{positionOf(h, i)}</div>
             <div className="opp-status">
-              {reveal ? (
-                <span className="mini-cards">
+              {reveal || mucked ? (
+                <span className={`mini-cards ${mucked ? 'mucked' : ''}`} title={mucked ? 'Folded hand' : undefined}>
                   {p.hole.map((c, k) => (
                     <CardView key={k} card={c} size="xs" />
                   ))}
@@ -135,6 +138,9 @@ function Result({ h }: { h: HandState }) {
     for (const w of pot.winners) won.set(w, (won.get(w) ?? 0) + Math.floor(pot.amount / pot.winners.length));
   }
   if (won.size === 0 && h.pots[0]) won.set(h.pots[0].winners[0], h.pots[0].amount);
+  // Everyone who showed down without winning anything, best hand first
+  const losers = h.showdown.filter((sd) => !won.has(sd.seat)).sort((a, b) => b.score - a.score);
+  const who = (seat: number) => (h.players[seat].isHuman ? 'You' : h.players[seat].name);
   return (
     <div className="result">
       {[...won.entries()].map(([seat, amt]) => {
@@ -149,6 +155,21 @@ function Result({ h }: { h: HandState }) {
           </div>
         );
       })}
+      {losers.length > 0 && (
+        <ul className="losers">
+          {losers.map((sd) => (
+            <li key={sd.seat}>
+              <span className="loser-name">{who(sd.seat)}</span>
+              <span className="loser-cards">
+                {sd.hole.map((c, k) => (
+                  <CardView key={k} card={c} size="xs" />
+                ))}
+              </span>
+              <span>{sd.label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

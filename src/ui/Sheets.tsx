@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { PROFILES } from '../bots/profiles';
 import { pct, type PlayerStats } from '../bots/stats';
 import type { HistoryEntry, Prefs } from '../store/persist';
-import type { Session } from '../session';
+import type { Session, TableKind } from '../session';
 import { CardView } from './CardView';
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -198,13 +198,21 @@ export function StatsSheet({ session, onClose }: { session: Session; onClose: ()
 interface SettingsProps {
   prefs: Prefs;
   variant: 'holdem' | 'plo';
+  table: TableKind;
   onPrefs: (p: Prefs) => void;
-  onNewSession: (lineup: 'default' | 'random', game?: 'holdem' | 'plo') => void;
+  onNewSession: (table?: TableKind, game?: 'holdem' | 'plo') => void;
   onClose: () => void;
 }
 
-export function SettingsSheet({ prefs, variant, onPrefs, onNewSession, onClose }: SettingsProps) {
-  const toggle = (k: 'showOdds' | 'revealStyles' | 'autoDeal', label: string, hint: string) => (
+const TABLE_INFO: { id: TableKind; label: string; hint: string }[] = [
+  { id: 'lively', label: 'Lively', hint: 'Casual players, a calling station and a maniac: lots of flops and action.' },
+  { id: 'mixed', label: 'Mixed', hint: 'One of each style, including a tight nit.' },
+  { id: 'tough', label: 'Tough', hint: 'Mostly solid and aggressive regulars. Fewer mistakes to exploit.' },
+  { id: 'random', label: 'Random', hint: 'Five styles picked at random.' },
+];
+
+export function SettingsSheet({ prefs, variant, table, onPrefs, onNewSession, onClose }: SettingsProps) {
+  const toggle = (k: 'showOdds' | 'showChance' | 'revealStyles' | 'revealMucked' | 'autoDeal', label: string, hint: string) => (
     <label className="toggle">
       <span>
         {label}
@@ -218,10 +226,10 @@ export function SettingsSheet({ prefs, variant, onPrefs, onNewSession, onClose }
       <div className="field">
         <span>Game</span>
         <div className="seg">
-          <button className={variant === 'holdem' ? 'on' : ''} onClick={() => variant !== 'holdem' && onNewSession('default', 'holdem')}>
+          <button className={variant === 'holdem' ? 'on' : ''} onClick={() => variant !== 'holdem' && onNewSession(undefined, 'holdem')}>
             No-limit Hold'em
           </button>
-          <button className={variant === 'plo' ? 'on' : ''} onClick={() => variant !== 'plo' && onNewSession('default', 'plo')}>
+          <button className={variant === 'plo' ? 'on' : ''} onClick={() => variant !== 'plo' && onNewSession(undefined, 'plo')}>
             Pot-limit Omaha
           </button>
         </div>
@@ -240,16 +248,24 @@ export function SettingsSheet({ prefs, variant, onPrefs, onNewSession, onClose }
           ))}
         </div>
       </div>
-      {toggle('showOdds', 'Show pot odds', 'The equity you need to make a call profitable.')}
+      {toggle('showOdds', 'Show what you need to call', 'How often you must win for a call to pay off, based on the price.')}
+      {toggle('showChance', 'Show my chance of winning', 'An estimate against the hands your opponents are likely to hold.')}
+      {toggle('revealMucked', 'Show all cards after the hand', 'Reveal the hands of players who folded, so you can see what they had.')}
       {toggle('revealStyles', 'Reveal player styles', 'Label each bot with how it plays. Off is more realistic.')}
       {toggle('autoDeal', 'Deal next hand automatically after you fold', 'Waits a few seconds (longer when cards are shown). Hands you play to the end always wait for you.')}
       <div className="field">
-        <span>New session</span>
-        <p className="fine">Resets stacks and stats for the current game. Hand history is kept.</p>
+        <span>Table</span>
         <div className="seg">
-          <button onClick={() => onNewSession('default')}>One of each style</button>
-          <button onClick={() => onNewSession('random')}>Random table</button>
+          {TABLE_INFO.map((t) => (
+            <button key={t.id} className={table === t.id ? 'on' : ''} onClick={() => onNewSession(t.id)}>
+              {t.label}
+            </button>
+          ))}
         </div>
+        <p className="fine">
+          {TABLE_INFO.find((t) => t.id === table)?.hint} Picking a table, even the current one, starts a new session with
+          fresh stacks and stats. Hand history is kept.
+        </p>
       </div>
     </Sheet>
   );

@@ -12,9 +12,20 @@ export interface Prefs {
   showOdds: boolean;
   revealStyles: boolean;
   autoDeal: boolean;
+  /** Show your estimated chance of winning next to the pot odds. */
+  showChance: boolean;
+  /** After a hand, show the cards of players who folded or lost without showing. */
+  revealMucked: boolean;
 }
 
-export const DEFAULT_PREFS: Prefs = { speed: 'normal', showOdds: true, revealStyles: false, autoDeal: true };
+export const DEFAULT_PREFS: Prefs = {
+  speed: 'normal',
+  showOdds: true,
+  revealStyles: false,
+  autoDeal: true,
+  showChance: true,
+  revealMucked: true,
+};
 
 export interface HistoryPlayer {
   seat: number;
