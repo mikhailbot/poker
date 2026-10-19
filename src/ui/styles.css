@@ -1099,3 +1099,25 @@ input:focus-visible {
     font-size: 14px;
   }
 }
+
+/* Deal button fills up while the next hand counts down */
+.btn-countdown {
+  position: relative;
+  overflow: hidden;
+}
+.btn-countdown .btn-label {
+  position: relative;
+}
+.countdown-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: fillup linear forwards;
+}
+@keyframes fillup {
+  to {
+    transform: scaleX(1);
+  }
+}

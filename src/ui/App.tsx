@@ -33,7 +33,9 @@ const BOT_DELAY: Record<Prefs['speed'], [number, number]> = {
 };
 /** Once you're out of the hand there's nothing to read, so bots play fast. */
 const FOLDED_DELAY: [number, number] = [70, 140];
-const NEXT_AFTER_FOLD = 1100;
+/** After you fold, how long the finished hand stays up before the next deal. */
+const PAUSE_SHOWDOWN = 7000; // cards were shown: time to study them
+const PAUSE_NO_SHOWDOWN = 3500;
 
 export const GAME_NAME: Record<Variant, string> = { holdem: "Hold'em", plo: 'Omaha' };
 
@@ -46,6 +48,9 @@ export function App() {
   const [history, setHistory] = useState(loadHistory);
   const [panel, setPanel] = useState<Panel>(null);
   const [thinking, setThinking] = useState(0);
+  /** Countdown (ms) until the next auto-deal, or 0 when none is running. */
+  const [autoIn, setAutoIn] = useState(0);
+  const [held, setHeld] = useState(false);
   const s = sessionRef.current;
   const h = s.hand;
   const hero = s.seats.find((x) => x.isHuman)!;
@@ -63,6 +68,8 @@ export function App() {
     const sess = sessionRef.current;
     if (!canDeal(sess)) return;
     dealNext(sess);
+    setHeld(false);
+    setAutoIn(0);
     if (sess.hand!.done) onHandDone();
     rerender();
   }, [onHandDone]);
@@ -76,8 +83,13 @@ export function App() {
     if (!h) return;
     if (h.done) {
       // If you stayed in to the end, wait so you can study the cards; only auto-deal after you fold
-      if (!prefs.autoDeal || heroBusted || panel || !h.players[0].folded) return;
-      const t = setTimeout(deal, NEXT_AFTER_FOLD);
+      if (!prefs.autoDeal || heroBusted || panel || held || !h.players[0].folded) {
+        setAutoIn(0);
+        return;
+      }
+      const wait = h.showdown.length ? PAUSE_SHOWDOWN : PAUSE_NO_SHOWDOWN;
+      setAutoIn(wait);
+      const t = setTimeout(deal, wait);
       return () => clearTimeout(t);
     }
     const p = h.players[h.toAct];
@@ -92,7 +104,7 @@ export function App() {
       rerender();
     }, delay);
     return () => clearTimeout(t);
-  }, [h, h?.actions.length, h?.done, prefs.autoDeal, prefs.speed, heroBusted, panel, deal, onHandDone]);
+  }, [h, h?.actions.length, h?.done, prefs.autoDeal, prefs.speed, heroBusted, panel, held, deal, onHandDone]);
 
   const onAct = (d: Decision) => {
     act(sessionRef.current, d);
@@ -204,8 +216,16 @@ export function App() {
                 Top up to {s.settings.buyInBB} BB
               </button>
             )}
-            <button className="btn btn-primary" onClick={deal}>
-              Deal next hand
+            {autoIn > 0 && !held && (
+              <button className="btn btn-quiet" onClick={() => setHeld(true)}>
+                Hold
+              </button>
+            )}
+            <button className="btn btn-primary btn-countdown" onClick={deal}>
+              {autoIn > 0 && !held && (
+                <span key={h.handId} className="countdown-fill" style={{ animationDuration: `${autoIn}ms` }} aria-hidden />
+              )}
+              <span className="btn-label">Deal next hand</span>
             </button>
           </div>
         )}

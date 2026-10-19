@@ -242,7 +242,7 @@ export function SettingsSheet({ prefs, variant, onPrefs, onNewSession, onClose }
       </div>
       {toggle('showOdds', 'Show pot odds', 'The equity you need to make a call profitable.')}
       {toggle('revealStyles', 'Reveal player styles', 'Label each bot with how it plays. Off is more realistic.')}
-      {toggle('autoDeal', 'Deal next hand automatically after you fold', 'Hands you play to the end always wait for you to tap Deal.')}
+      {toggle('autoDeal', 'Deal next hand automatically after you fold', 'Waits a few seconds (longer when cards are shown). Hands you play to the end always wait for you.')}
       <div className="field">
         <span>New session</span>
         <p className="fine">Resets stacks and stats for the current game. Hand history is kept.</p>
