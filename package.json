@@ -1,0 +1,28 @@
+{
+  "name": "card-room",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Practice no-limit hold'em against realistic bots. Single player, offline, no accounts.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "simulate": "tsx scripts/simulate.ts",
+    "gen:preflop": "tsx scripts/genPreflop.ts"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.0"
+  }
+}
