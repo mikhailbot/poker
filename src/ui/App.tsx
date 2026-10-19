@@ -36,8 +36,8 @@ const BOT_DELAY: Record<Prefs['speed'], [number, number]> = {
 /** Once you're out of the hand there's nothing to read, so bots play fast. */
 const FOLDED_DELAY: [number, number] = [70, 140];
 /** After you fold, how long the finished hand stays up before the next deal. */
-const PAUSE_SHOWDOWN = 7000; // cards were shown: time to study them
-const PAUSE_NO_SHOWDOWN = 3500;
+const PAUSE_SHOWDOWN = 8000; // cards were shown: time to study them
+const PAUSE_NO_SHOWDOWN = 4500;
 
 export const GAME_NAME: Record<Variant, string> = { holdem: "Hold'em", plo: 'Omaha' };
 

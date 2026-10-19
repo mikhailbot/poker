@@ -1209,5 +1209,13 @@ input:focus-visible {
   margin-top: 2px;
 }
 .winner-hand .no-show {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  line-height: 1.25;
+}
+.winner-hand .no-show small {
+  font-size: 12px;
   opacity: 0.75;
 }

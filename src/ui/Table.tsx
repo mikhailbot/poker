@@ -159,7 +159,14 @@ function Result({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
                     <CardView key={k} card={c} size="sm" />
                   ))}
                 </span>
-                {sd ? <span>{sd.label}</span> : <span className="no-show">Everyone else folded</span>}
+                {sd ? (
+                  <span>{sd.label}</span>
+                ) : (
+                  <span className="no-show">
+                    {handRead(h, p.hole)}
+                    <small>Everyone else folded</small>
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -191,23 +198,28 @@ function rankPhrase(pct: number): string {
   return pct <= 0.5 ? `top ${Math.max(1, Math.round(pct * 100))}%` : `bottom ${Math.max(1, Math.round((1 - pct) * 100))}%`;
 }
 
+/** Plain-English read of a hand on the current board (or its starting-hand rank before the flop). */
+function handRead(h: HandState, holeIn: number[]): string {
+  const hole = [...holeIn].sort((a, b) => b - a);
+  if (hole.length === 4) {
+    return h.board.length >= 3
+      ? describeScore(scoreHand('plo', hole, h.board))
+      : `${describePlo(hole)}, ${rankPhrase(ploPct(hole))}`;
+  }
+  if (hole.length !== 2) return '';
+  if (h.board.length >= 3) return describeScore(scoreHand('holdem', hole, h.board));
+  const key = handKey(hole[0], hole[1]);
+  const name =
+    key.length === 2
+      ? `Pocket ${key[0] === 'T' ? '10' : key[0]}s`
+      : `${key.slice(0, 2).replace('T', '10')} ${key[2] === 's' ? 'suited' : 'offsuit'}`;
+  return `${name}, ${rankPhrase(PREFLOP[key][0])} of hands`;
+}
+
 function Hero({ h }: { h: HandState }) {
   const me = h.players[0];
   const hole = [...me.hole].sort((a, b) => b - a);
-  let read = '';
-  if (hole.length === 4) {
-    read =
-      h.board.length >= 3
-        ? describeScore(scoreHand('plo', hole, h.board))
-        : `${describePlo(hole)}, ${rankPhrase(ploPct(hole))}`;
-  } else if (hole.length === 2) {
-    if (h.board.length >= 3) read = describeScore(scoreHand('holdem', hole, h.board));
-    else {
-      const key = handKey(hole[0], hole[1]);
-      const name = key.length === 2 ? `Pocket ${key[0] === 'T' ? '10' : key[0]}s` : `${key.slice(0, 2).replace('T', '10')} ${key[2] === 's' ? 'suited' : 'offsuit'}`;
-      read = `${name}, ${rankPhrase(PREFLOP[key][0])} of hands`;
-    }
-  }
+  const read = handRead(h, me.hole);
   const active = !h.done && h.toAct === 0;
   return (
     <section className={`hero ${active ? 'active' : ''} ${me.folded ? 'folded' : ''}`} aria-label="Your hand">
