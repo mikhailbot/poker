@@ -11,7 +11,9 @@
  */
 
 const STATUS_BAR_FALLBACK = 54; // covers notch and Dynamic Island iPhones
-const BLUR_CLEARANCE = 8; // the blur extends a few points past the status bar
+// The iOS 26 blur reaches well below the status bar: on a Dynamic Island iPhone it
+// fades out about 100pt from the top, so start content below that.
+const BLUR_CLEARANCE = 36;
 const HOME_INDICATOR_FALLBACK = 21;
 
 function isStandalone(): boolean {
