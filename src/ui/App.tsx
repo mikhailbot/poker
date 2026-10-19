@@ -33,7 +33,6 @@ const BOT_DELAY: Record<Prefs['speed'], [number, number]> = {
 };
 /** Once you're out of the hand there's nothing to read, so bots play fast. */
 const FOLDED_DELAY: [number, number] = [70, 140];
-const NEXT_HAND_DELAY = { relaxed: 4200, normal: 3000, fast: 1500 };
 const NEXT_AFTER_FOLD = 1100;
 
 export const GAME_NAME: Record<Variant, string> = { holdem: "Hold'em", plo: 'Omaha' };
@@ -76,9 +75,9 @@ export function App() {
   useEffect(() => {
     if (!h) return;
     if (h.done) {
-      if (!prefs.autoDeal || heroBusted || panel) return;
-      const foldedEarly = h.players[0].folded;
-      const t = setTimeout(deal, foldedEarly ? NEXT_AFTER_FOLD : NEXT_HAND_DELAY[prefs.speed]);
+      // If you stayed in to the end, wait so you can study the cards; only auto-deal after you fold
+      if (!prefs.autoDeal || heroBusted || panel || !h.players[0].folded) return;
+      const t = setTimeout(deal, NEXT_AFTER_FOLD);
       return () => clearTimeout(t);
     }
     const p = h.players[h.toAct];
