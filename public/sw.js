@@ -1,5 +1,5 @@
 // Minimal offline cache: network first, fall back to cache.
-const CACHE = 'card-room-v1';
+const CACHE = 'card-room-v2';
 self.addEventListener('install', (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html'])));
