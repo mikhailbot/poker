@@ -105,9 +105,8 @@ input:focus-visible {
   margin: 0 auto;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  /* --safe-top/--safe-bottom are set by safeArea.ts for the installed iPhone app */
-  padding: var(--safe-top, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
-    var(--safe-bottom, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px)
+    max(12px, env(safe-area-inset-left, 0px));
 }
 
 .topbar {
@@ -816,7 +815,7 @@ input:focus-visible {
   border-radius: 24px 24px 0 0;
   display: flex;
   flex-direction: column;
-  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   animation: slide 240ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .sheet-head {
@@ -1232,9 +1231,4 @@ input:focus-visible {
     width: 100%;
     height: min(var(--app-h, 100dvh), 860px);
   }
-}
-
-/* Installed app: keep sheets below the status bar blur */
-.standalone .sheet {
-  max-height: calc(100dvh - var(--safe-top, 0px) - 12px);
 }

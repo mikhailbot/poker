@@ -1,10 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { installSafeAreas } from './safeArea';
 import { App } from './ui/App';
 import './ui/styles.css';
-
-installSafeAreas();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
