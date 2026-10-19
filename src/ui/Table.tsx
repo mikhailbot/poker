@@ -39,7 +39,7 @@ export function Table({ session, revealStyles, revealMucked, thinking }: Props) 
   return (
     <div className={`table ${h.variant === 'plo' ? 'is-plo' : ''}`}>
       <Opponents h={h} session={session} revealStyles={revealStyles} revealMucked={revealMucked} thinking={thinking} />
-      <Stage h={h} />
+      <Stage h={h} revealMucked={revealMucked} />
       <Hero h={h} />
     </div>
   );
@@ -107,7 +107,7 @@ function Opponents({ h, session, revealStyles, revealMucked, thinking }: { h: Ha
 
 // ------------------------------------------------------------ stage
 
-function Stage({ h }: { h: HandState }) {
+function Stage({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
   const last = [...h.actions].reverse().find((a) => a.type !== 'post');
   const pot = h.done ? h.pots.reduce((s, p) => s + p.amount, 0) : potTotal(h);
   return (
@@ -125,13 +125,13 @@ function Stage({ h }: { h: HandState }) {
         ))}
       </div>
       <div className="ticker" aria-live="polite">
-        {h.done ? <Result h={h} /> : last ? describeAction(h, last) : `Blinds ${h.smallBlind}/${h.bigBlind}`}
+        {h.done ? <Result h={h} revealMucked={revealMucked} /> : last ? describeAction(h, last) : `Blinds ${h.smallBlind}/${h.bigBlind}`}
       </div>
     </section>
   );
 }
 
-function Result({ h }: { h: HandState }) {
+function Result({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
   const won = new Map<number, number>();
   for (const pot of h.pots) {
     if (pot.eligible.length === 1 && h.pots.length > 1) continue; // uncalled bet returned
@@ -151,7 +151,17 @@ function Result({ h }: { h: HandState }) {
             <strong>
               {p.isHuman ? 'You win' : `${p.name} wins`} {amt}
             </strong>
-            {sd && <span>{sd.label}</span>}
+            {/* Winner's cards: shown at showdown, or (when not shown) only if mucked hands are revealed */}
+            {(sd || p.isHuman || revealMucked) && (
+              <span className="winner-hand">
+                <span className="loser-cards">
+                  {[...p.hole].sort((a, b) => b - a).map((c, k) => (
+                    <CardView key={k} card={c} size="sm" />
+                  ))}
+                </span>
+                {sd ? <span>{sd.label}</span> : <span className="no-show">Everyone else folded</span>}
+              </span>
+            )}
           </div>
         );
       })}

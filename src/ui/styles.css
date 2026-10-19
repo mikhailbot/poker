@@ -461,6 +461,10 @@ input:focus-visible {
 }
 .result span {
   font-size: 13px;
+}
+/* Fade the hand descriptions, never the cards */
+.result .winner-hand > span:not(.loser-cards),
+.losers li > span:not(.loser-cards) {
   opacity: 0.85;
 }
 
@@ -1183,7 +1187,6 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  opacity: 0.85;
 }
 .loser-name {
   font-weight: 600;
@@ -1196,4 +1199,15 @@ input:focus-visible {
 }
 .mini-cards.mucked {
   opacity: 0.5;
+}
+
+.winner-hand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.winner-hand .no-show {
+  opacity: 0.75;
 }
