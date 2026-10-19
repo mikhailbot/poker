@@ -1,126 +1,137 @@
+import { PREFLOP } from '../bots/preflopTable';
 import { PROFILES } from '../bots/profiles';
-import { type HandState, type Player, positionOf, potBeforeStreet } from '../engine/game';
+import { handKey } from '../engine/cards';
+import { describeScore } from '../engine/evaluator';
+import { scoreHand } from '../engine/omaha';
+import { describePlo, ploPct } from '../bots/plo';
+import { type HandState, describeAction, positionOf, potTotal } from '../engine/game';
 import type { Session } from '../session';
 import { CardView } from './CardView';
 
-const SEAT_POS: [number, number][] = [
-  [50, 86],
-  [11, 67],
-  [11, 31],
-  [50, 11],
-  [89, 31],
-  [89, 67],
-];
-const CENTER: [number, number] = [50, 47];
+const STREET: Record<string, string> = { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' };
+const VERB: Record<string, string> = { fold: 'Folded', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', post: '' };
 
-const toward = ([x, y]: [number, number], f: number): [number, number] => [x + (CENTER[0] - x) * f, y + (CENTER[1] - y) * f];
-
-function lastAction(h: HandState, seat: number): string {
+/** What a seat did most recently on the current street. */
+function streetAction(h: HandState, seat: number) {
   for (let i = h.actions.length - 1; i >= 0; i--) {
     const a = h.actions[i];
-    if (a.street !== h.street) break;
     if (a.seat !== seat) continue;
-    if (a.type === 'post') return '';
-    const word = { fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', post: '' }[a.type];
-    return a.allIn ? 'All-in' : word;
+    if (a.type === 'fold') return { word: 'Folded', kind: 'fold' };
+    if (a.street !== h.street) return null;
+    if (a.type === 'post') return { word: a.amount === h.smallBlind ? 'SB' : 'BB', kind: 'post' };
+    return { word: a.allIn ? 'All-in' : VERB[a.type], kind: a.allIn ? 'allin' : a.type };
   }
-  return '';
+  return null;
 }
 
 interface Props {
   session: Session;
   revealStyles: boolean;
+  /** Current bot think time in ms (drives the timer ring), 0 when idle. */
   thinking: number;
 }
 
 export function Table({ session, revealStyles, thinking }: Props) {
   const h = session.hand;
-  const winners = new Set(h?.done ? h.pots.flatMap((p) => p.winners) : []);
-  const shown = new Set(h?.showdown.map((s) => s.seat) ?? []);
-
+  if (!h) return null;
   return (
-    <div className="table-wrap">
-      <div className="felt">
-        <div className="felt-inner" />
-      </div>
-
-      {h && (
-        <div className="center" style={{ left: `${CENTER[0]}%`, top: `${CENTER[1]}%` }}>
-          <div className="pot">
-            <span className="pot-label">Pot</span>
-            <span className="pot-amt">{h.done ? h.pots.reduce((s, p) => s + p.amount, 0) : potBeforeStreet(h)}</span>
-          </div>
-          <div className="board">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <CardView key={i} card={h.board[i]} size="md" />
-            ))}
-          </div>
-          {h.done && <ResultLine h={h} />}
-        </div>
-      )}
-
-      {session.seats.map((seat, i) => {
-        const p: Player | undefined = h?.players[i];
-        const [x, y] = SEAT_POS[i];
-        const [bx, by] = toward(SEAT_POS[i], i === 0 ? 0.42 : 0.5);
-        const [dx, dy] = toward(SEAT_POS[i], 0.28);
-        const active = h && !h.done && h.toAct === i;
-        const folded = p?.folded;
-        const faceUp = p && (seat.isHuman || (h?.done && shown.has(i)));
-        const act = h && p ? lastAction(h, i) : '';
-        const stack = p ? p.stack : seat.stack;
-        const prof = PROFILES[seat.profileId];
-        const sd = h?.showdown.find((s) => s.seat === i);
-        return (
-          <div key={i}>
-            <div
-              className={`seat ${seat.isHuman ? 'hero' : ''} ${active ? 'active' : ''} ${folded ? 'folded' : ''} ${winners.has(i) ? 'winner' : ''}`}
-              style={{ left: `${x}%`, top: `${y}%` }}
-            >
-              <div className="seat-cards">
-                {p && p.hole.length === 2 && !(folded && !seat.isHuman) ? (
-                  [...p.hole].sort((a, b) => b - a).map((c, k) => (
-                    <CardView key={k} card={c} faceDown={!faceUp} size={seat.isHuman ? 'lg' : 'sm'} dim={folded} />
-                  ))
-                ) : (
-                  <div className="cards-placeholder" />
-                )}
-              </div>
-              <div className="plate">
-                <div className="plate-name">
-                  {seat.name}
-                  {h && p && !p.sittingOut && <span className="pos">{positionOf(h, i)}</span>}
-                </div>
-                <div className="plate-stack">{stack === 0 && p?.allIn ? 'All-in' : stack}</div>
-                {active && !seat.isHuman && thinking > 0 && <div className="thinking" />}
-              </div>
-              {act && !h?.done && <div className={`act act-${act.toLowerCase().replace('-', '')}`}>{act}</div>}
-              {sd && h?.done && <div className="sd-label">{sd.label}</div>}
-              {revealStyles && prof && <div className="style-tag">{prof.style}</div>}
-            </div>
-            {p && p.bet > 0 && !h?.done && (
-              <div className="bet" style={{ left: `${bx}%`, top: `${by}%` }}>
-                <span className="chip" />
-                {p.bet}
-              </div>
-            )}
-            {h && h.button === i && (
-              <div className="dealer" style={{ left: `${dx + (i === 0 ? 9 : 0)}%`, top: `${dy}%` }} aria-label="Dealer button">
-                D
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div className={`table ${h.variant === 'plo' ? 'is-plo' : ''}`}>
+      <Opponents h={h} session={session} revealStyles={revealStyles} thinking={thinking} />
+      <Stage h={h} />
+      <Hero h={h} />
     </div>
   );
 }
 
-function ResultLine({ h }: { h: HandState }) {
+// ------------------------------------------------------------ opponents
+
+function Opponents({ h, session, revealStyles, thinking }: { h: HandState } & Props) {
+  const winners = new Set(h.done ? h.pots.filter((p) => p.eligible.length > 1 || h.pots.length === 1).flatMap((p) => p.winners) : []);
+  const shown = new Set(h.showdown.map((s) => s.seat));
+  return (
+    <ol className="opps" aria-label="Opponents in acting order after you">
+      {h.players.slice(1).map((p) => {
+        const i = p.seat;
+        const seat = session.seats[i];
+        const act = streetAction(h, i);
+        const active = !h.done && h.toAct === i;
+        const reveal = h.done && shown.has(i);
+        const cls = ['opp', `hue-${i}`, active && 'active', p.folded && 'folded', winners.has(i) && 'winner'].filter(Boolean).join(' ');
+        return (
+          <li key={i} className={cls}>
+            <div className="token" aria-hidden>
+              {active && thinking > 0 && (
+                <svg className="timer" viewBox="0 0 44 44" key={h.actions.length}>
+                  <circle cx="22" cy="22" r="20" style={{ animationDuration: `${thinking}ms` }} />
+                </svg>
+              )}
+              <span>{seat.name[0]}</span>
+              {h.button === i && <b className="dealer">D</b>}
+            </div>
+            <div className="opp-name">{seat.name}</div>
+            <div className="opp-stack">{p.stack === 0 && p.allIn ? 'All-in' : p.stack}</div>
+            <div className="opp-pos">{positionOf(h, i)}</div>
+            <div className="opp-status">
+              {reveal ? (
+                <span className="mini-cards">
+                  {p.hole.map((c, k) => (
+                    <CardView key={k} card={c} size="xs" />
+                  ))}
+                </span>
+              ) : p.folded ? (
+                <span className="pill pill-fold">Folded</span>
+              ) : p.bet > 0 && !h.done ? (
+                <span className={`pill pill-${act?.kind ?? 'post'}`}>
+                  {act && act.kind !== 'post' ? `${act.word} ` : ''}
+                  {p.bet}
+                </span>
+              ) : act && !h.done ? (
+                <span className={`pill pill-${act.kind}`}>{act.word}</span>
+              ) : (
+                <span className="cardbacks" aria-label="Holding cards">
+                  <i />
+                  <i />
+                </span>
+              )}
+            </div>
+            {revealStyles && PROFILES[seat.profileId] && <div className="opp-style">{PROFILES[seat.profileId].style}</div>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// ------------------------------------------------------------ stage
+
+function Stage({ h }: { h: HandState }) {
+  const last = [...h.actions].reverse().find((a) => a.type !== 'post');
+  const pot = h.done ? h.pots.reduce((s, p) => s + p.amount, 0) : potTotal(h);
+  return (
+    <section className="stage" aria-label="Board">
+      <div className="stage-head">
+        <span className="street">{h.done ? (h.showdown.length ? 'Showdown' : 'Hand over') : STREET[h.street]}</span>
+        <span className="pot">
+          <small>Pot</small>
+          {pot}
+        </span>
+      </div>
+      <div className="board">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <CardView key={`${i}-${h.board[i] ?? 'x'}`} card={h.board[i]} size="lg" delay={i < 3 ? i * 70 : 0} />
+        ))}
+      </div>
+      <div className="ticker" aria-live="polite">
+        {h.done ? <Result h={h} /> : last ? describeAction(h, last) : `Blinds ${h.smallBlind}/${h.bigBlind}`}
+      </div>
+    </section>
+  );
+}
+
+function Result({ h }: { h: HandState }) {
   const won = new Map<number, number>();
   for (const pot of h.pots) {
-    // Don't count an uncalled bet returned to its owner as a "win"
-    if (pot.eligible.length === 1 && h.pots.length > 1) continue;
+    if (pot.eligible.length === 1 && h.pots.length > 1) continue; // uncalled bet returned
     for (const w of pot.winners) won.set(w, (won.get(w) ?? 0) + Math.floor(pot.amount / pot.winners.length));
   }
   if (won.size === 0 && h.pots[0]) won.set(h.pots[0].winners[0], h.pots[0].amount);
@@ -130,12 +141,61 @@ function ResultLine({ h }: { h: HandState }) {
         const p = h.players[seat];
         const sd = h.showdown.find((s) => s.seat === seat);
         return (
-          <div key={seat}>
-            {p.isHuman ? 'You win' : `${p.name} wins`} {amt}
-            {sd ? ` with ${sd.label.toLowerCase()}` : ''}
+          <div key={seat} className={p.isHuman ? 'result-me' : ''}>
+            <strong>
+              {p.isHuman ? 'You win' : `${p.name} wins`} {amt}
+            </strong>
+            {sd && <span>{sd.label}</span>}
           </div>
         );
       })}
     </div>
+  );
+}
+
+// ------------------------------------------------------------ hero
+
+function Hero({ h }: { h: HandState }) {
+  const me = h.players[0];
+  const hole = [...me.hole].sort((a, b) => b - a);
+  let read = '';
+  if (hole.length === 4) {
+    read =
+      h.board.length >= 3
+        ? describeScore(scoreHand('plo', hole, h.board))
+        : `${describePlo(hole)}, top ${Math.max(1, Math.round(ploPct(hole) * 100))}%`;
+  } else if (hole.length === 2) {
+    if (h.board.length >= 3) read = describeScore(scoreHand('holdem', hole, h.board));
+    else {
+      const key = handKey(hole[0], hole[1]);
+      const top = Math.max(1, Math.round(PREFLOP[key][0] * 100));
+      const name = key.length === 2 ? `Pocket ${key[0] === 'T' ? '10' : key[0]}s` : `${key.slice(0, 2).replace('T', '10')} ${key[2] === 's' ? 'suited' : 'offsuit'}`;
+      read = `${name}, top ${top}% of hands`;
+    }
+  }
+  const active = !h.done && h.toAct === 0;
+  return (
+    <section className={`hero ${active ? 'active' : ''} ${me.folded ? 'folded' : ''}`} aria-label="Your hand">
+      <div className="hero-cards">
+        {hole.map((c, k) => (
+          <CardView key={`${h.handId}-${k}`} card={c} size="lg" dim={me.folded} />
+        ))}
+      </div>
+      <div className="hero-info">
+        <div className="hero-read">{me.folded ? 'You folded' : read}</div>
+        <div className="hero-meta">
+          <span className="hero-pos">{positionOf(h, 0)}</span>
+          <span>
+            Stack <b>{me.stack}</b>
+          </span>
+          {me.bet > 0 && !h.done && (
+            <span>
+              In <b>{me.bet}</b>
+            </span>
+          )}
+          {h.button === 0 && <span className="dealer inline">D</span>}
+        </div>
+      </div>
+    </section>
   );
 }

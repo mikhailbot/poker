@@ -30,6 +30,7 @@ export interface HistoryPlayer {
 
 export interface HistoryEntry {
   id: number;
+  variant?: 'holdem' | 'plo';
   time: number;
   bigBlind: number;
   board: Card[];
@@ -91,6 +92,7 @@ export function toHistory(h: HandState, notes: Record<number, string>): HistoryE
   const hero = h.players.find((p) => p.isHuman);
   return {
     id: h.handId,
+    variant: h.variant,
     time: Date.now(),
     bigBlind: h.bigBlind,
     board: h.board,

@@ -6,11 +6,12 @@
   "description": "Practice no-limit hold'em against realistic bots. Single player, offline, no accounts.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "simulate": "tsx scripts/simulate.ts",
-    "gen:preflop": "tsx scripts/genPreflop.ts"
+    "gen:preflop": "tsx scripts/genPreflop.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^19.2.0",

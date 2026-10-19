@@ -2,6 +2,7 @@ import { decide, type BotChoice } from './bots/brain';
 import { BOT_NAMES, PROFILE_IDS } from './bots/profiles';
 import { emptyStats, recordHand, type PlayerStats } from './bots/stats';
 import { type Decision, type HandState, applyDecision, nextSeat, startHand } from './engine/game';
+import type { Variant } from './engine/omaha';
 
 export interface SeatInfo {
   name: string;
@@ -14,6 +15,8 @@ export interface SeatInfo {
 }
 
 export interface Settings {
+  /** Texas hold'em or pot-limit Omaha. */
+  variant: Variant;
   smallBlind: number;
   bigBlind: number;
   /** Starting stack in big blinds. */
@@ -23,6 +26,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  variant: 'holdem',
   smallBlind: 1,
   bigBlind: 2,
   buyInBB: 100,
@@ -106,6 +110,8 @@ export function dealNext(s: Session): HandState {
     s.settings.smallBlind,
     s.settings.bigBlind,
     s.handCount,
+    undefined,
+    s.settings.variant ?? 'holdem',
   );
   if (s.hand.done) finishHand(s);
   return s.hand;
@@ -115,6 +121,12 @@ export function act(s: Session, d: Decision) {
   const h = s.hand!;
   applyDecision(h, d);
   if (h.done) finishHand(s);
+}
+
+/** Play the rest of the hand instantly (used once you've folded). */
+export function runOut(s: Session) {
+  let guard = 0;
+  while (s.hand && !s.hand.done && !s.hand.players[s.hand.toAct].isHuman && guard++ < 200) botAct(s);
 }
 
 export function botAct(s: Session): BotChoice {

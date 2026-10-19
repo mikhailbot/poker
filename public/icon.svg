@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#3b2518"/>
-  <rect x="44" y="44" width="424" height="424" rx="84" fill="#5b1f27" stroke="#c9a35b" stroke-width="6"/>
-  <g transform="rotate(-10 256 256)">
-    <rect x="132" y="120" width="190" height="266" rx="22" fill="#f2ebda"/>
-    <text x="152" y="200" font-family="Georgia, serif" font-weight="700" font-size="78" fill="#1f1915">A</text>
-    <text x="236" y="360" font-family="Georgia, serif" font-size="96" fill="#1f1915">♠</text>
+  <rect width="512" height="512" rx="112" fill="#3442f0"/>
+  <g transform="rotate(-9 256 256)">
+    <rect x="118" y="112" width="196" height="276" rx="30" fill="#fbfcfd"/>
+    <text x="216" y="270" text-anchor="middle" font-family="Arial Narrow, Arial, sans-serif" font-weight="700" font-size="150" fill="#14171d">A</text>
+    <text x="216" y="350" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" fill="#14171d">♠</text>
   </g>
-  <g transform="rotate(12 256 256)">
-    <rect x="212" y="136" width="190" height="266" rx="22" fill="#f2ebda" stroke="#3e1319" stroke-width="3"/>
-    <text x="232" y="216" font-family="Georgia, serif" font-weight="700" font-size="78" fill="#b0262b">K</text>
-    <text x="314" y="376" font-family="Georgia, serif" font-size="96" fill="#b0262b">♥</text>
+  <g transform="rotate(10 256 256)">
+    <rect x="206" y="132" width="196" height="276" rx="30" fill="#fbfcfd" stroke="#3442f0" stroke-width="6"/>
+    <text x="304" y="290" text-anchor="middle" font-family="Arial Narrow, Arial, sans-serif" font-weight="700" font-size="150" fill="#e0333d">K</text>
+    <text x="304" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" fill="#e0333d">♥</text>
   </g>
 </svg>

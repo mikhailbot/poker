@@ -132,3 +132,34 @@ function popcount(x: number): number {
 
 export const handCategory = (score: number) => score >> 20;
 export const handName = (score: number) => HAND_NAMES[score >> 20];
+
+const RANK_NAME = ['Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King', 'Ace'];
+const plural = (r: number) => (r === 4 ? 'Sixes' : `${RANK_NAME[r]}s`);
+const lower = (s: string) => s.toLowerCase();
+
+/** Plain-English description, e.g. "Two pair, kings and sevens". */
+export function describeScore(score: number): string {
+  const cat = score >> 20;
+  const r1 = (score >> 16) & 15;
+  const r2 = (score >> 12) & 15;
+  switch (cat) {
+    case 0:
+      return `${RANK_NAME[r1]} high`;
+    case 1:
+      return `Pair of ${lower(plural(r1))}`;
+    case 2:
+      return `Two pair, ${lower(plural(r1))} and ${lower(plural(r2))}`;
+    case 3:
+      return `Three ${lower(plural(r1))}`;
+    case 4:
+      return `Straight, ${lower(RANK_NAME[r1])} high`;
+    case 5:
+      return `Flush, ${lower(RANK_NAME[r1])} high`;
+    case 6:
+      return `Full house, ${lower(plural(r1))} full of ${lower(plural(r2))}`;
+    case 7:
+      return `Four ${lower(plural(r1))}`;
+    default:
+      return r1 === 12 ? 'Royal flush' : `Straight flush, ${lower(RANK_NAME[r1])} high`;
+  }
+}

@@ -19,7 +19,14 @@ export function ActionBar({ hand: h, showOdds, onAct }: Props) {
       to = Math.round(Math.min(Math.max(to, la.minRaiseTo), la.maxRaiseTo));
       if (!out.some((o) => o.to === to)) out.push({ label, to });
     };
-    if (h.street === 'preflop') {
+    if (h.variant === 'plo') {
+      // Pot-limit: sizes as fractions of a pot-sized raise
+      const potRaise = (f: number) => h.currentBet + f * (pot + la.callAmount);
+      add('Min', la.minRaiseTo);
+      add('½ pot', potRaise(0.5));
+      add('¾ pot', potRaise(0.75));
+      add('Pot', potRaise(1));
+    } else if (h.street === 'preflop') {
       if (h.currentBet === bb) {
         add('2.5 BB', bb * 2.5);
         add('3 BB', bb * 3);
@@ -38,9 +45,9 @@ export function ActionBar({ hand: h, showOdds, onAct }: Props) {
       add('3×', h.currentBet * 3);
       add('Pot', h.currentBet + pot + la.callAmount);
     }
-    add('All-in', la.maxRaiseTo);
+    add(la.maxRaiseTo === me.bet + me.stack ? 'All-in' : 'Max', la.maxRaiseTo);
     return out;
-  }, [h, la.minRaiseTo, la.maxRaiseTo, la.callAmount, la.isBet, pot, bb]);
+  }, [h, la.minRaiseTo, la.maxRaiseTo, la.callAmount, la.isBet, pot, bb, me.bet, me.stack]);
 
   const [sizing, setSizing] = useState(false);
   const [amount, setAmount] = useState(presets[0]?.to ?? la.minRaiseTo);
@@ -51,13 +58,16 @@ export function ActionBar({ hand: h, showOdds, onAct }: Props) {
 
   const potOdds = la.callAmount > 0 ? la.callAmount / (pot + la.callAmount) : 0;
   const raiseWord = la.isBet ? 'Bet' : 'Raise to';
-  const allIn = amount >= la.maxRaiseTo;
+  const allIn = amount >= me.bet + me.stack;
 
   return (
     <div className="actionbar">
       {showOdds && la.callAmount > 0 && (
         <div className="odds">
-          Call {la.callAmount} to win {pot} — you need {Math.round(potOdds * 100)}% equity
+          <span className="odds-pct">{Math.round(potOdds * 100)}%</span>
+          <span>
+            equity needed to call {la.callAmount} into a pot of {pot}
+          </span>
         </div>
       )}
 
@@ -116,7 +126,7 @@ export function ActionBar({ hand: h, showOdds, onAct }: Props) {
             </button>
           ) : (
             <button className="btn btn-raise" onClick={() => setSizing(true)}>
-              {la.isBet ? 'Bet…' : 'Raise…'}
+              {la.isBet ? 'Bet' : 'Raise'}
             </button>
           ))}
       </div>

@@ -7,8 +7,9 @@ import { estimate, pct } from '../src/bots/stats';
 import { botAct, createSession, dealNext, DEFAULT_SETTINGS } from '../src/session';
 
 const HANDS = Number(process.argv[2] ?? 3000);
+const VARIANT = (process.argv[3] ?? 'holdem') as 'holdem' | 'plo';
 const lineup = ['nit', 'tag', 'lag', 'station', 'maniac', 'tag'];
-const s = createSession({ ...DEFAULT_SETTINGS, lineup }, 'x', false);
+const s = createSession({ ...DEFAULT_SETTINGS, lineup, variant: VARIANT }, 'x', false);
 // force one of each profile into fixed seats
 s.seats.forEach((seat, i) => (seat.profileId = lineup[i]));
 

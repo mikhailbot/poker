@@ -1,18 +1,19 @@
 import { type Card, handKey } from '../engine/cards';
 import { evaluate } from '../engine/evaluator';
+import { evaluateOmaha, type Variant } from '../engine/omaha';
+import { ploPct } from './plo';
 import { PREFLOP } from './preflopTable';
 
 /** All 1326 two-card combos with their preflop percentile (0 = best). */
 interface Combo {
-  a: Card;
-  b: Card;
+  cards: Card[];
   pct: number;
 }
 const COMBOS: Combo[] = [];
 for (let a = 0; a < 52; a++)
-  for (let b = a + 1; b < 52; b++) COMBOS.push({ a, b, pct: PREFLOP[handKey(a, b)][0] });
+  for (let b = a + 1; b < 52; b++) COMBOS.push({ cards: [a, b], pct: PREFLOP[handKey(a, b)][0] });
 
-export const preflopPct = (a: Card, b: Card) => PREFLOP[handKey(a, b)][0];
+export const preflopPct = (hole: Card[]) => (hole.length === 4 ? ploPct(hole) : PREFLOP[handKey(hole[0], hole[1])][0]);
 
 /**
  * What we believe about one opponent's holding.
@@ -29,36 +30,64 @@ export interface RangeBelief {
 
 const rand = Math.random;
 
-function rangeCombos(r: RangeBelief, dead: Set<Card>): Combo[] {
+function holdemRange(r: RangeBelief, dead: Set<Card>): Combo[] {
   let lo = Math.max(0, r.lo);
   let hi = Math.min(1, Math.max(r.hi, lo + 0.02));
-  let list = COMBOS.filter((c) => c.pct >= lo && c.pct <= hi && !dead.has(c.a) && !dead.has(c.b));
+  const ok = (c: Combo) => c.pct >= lo && c.pct <= hi && !dead.has(c.cards[0]) && !dead.has(c.cards[1]);
+  let list = COMBOS.filter(ok);
   // Widen if card removal empties the range
   while (list.length < 6 && (lo > 0 || hi < 1)) {
     lo = Math.max(0, lo - 0.05);
     hi = Math.min(1, hi + 0.05);
-    list = COMBOS.filter((c) => c.pct >= lo && c.pct <= hi && !dead.has(c.a) && !dead.has(c.b));
+    list = COMBOS.filter(ok);
   }
   return list;
 }
 
 /**
+ * Build a pool of Omaha hands from the live cards whose percentile is inside the range.
+ * Scoring 4-card hands is relatively slow, so we sample a pool once per decision
+ * and draw from it in every simulation.
+ */
+function omahaPool(r: RangeBelief, dead: Set<Card>, size = 220): Card[][] {
+  const lo = Math.max(0, r.lo);
+  const hi = Math.min(1, Math.max(r.hi, lo + 0.03));
+  const live = Array.from({ length: 52 }, (_, i) => i).filter((c) => !dead.has(c));
+  const pool: Card[][] = [];
+  const any: Card[][] = [];
+  for (let tries = 0; tries < 6000 && pool.length < size; tries++) {
+    for (let i = 0; i < 4; i++) {
+      const j = i + ((rand() * (live.length - i)) | 0);
+      [live[i], live[j]] = [live[j], live[i]];
+    }
+    const h = live.slice(0, 4);
+    if (any.length < size) any.push(h);
+    const p = ploPct(h);
+    if (p >= lo && p <= hi) pool.push(h);
+  }
+  return pool.length >= 20 ? pool : any;
+}
+
+/**
  * Monte Carlo equity of `hole` against opponents holding hands from their believed ranges.
- * Returns share of the pot won on average (ties split).
+ * Returns the share of the pot won on average (ties split).
  */
 export function equityVsRanges(
   hole: Card[],
   board: Card[],
   ranges: RangeBelief[],
   sims = 700,
+  variant: Variant = 'holdem',
 ): number {
   if (ranges.length === 0) return 1;
+  const plo = variant === 'plo';
+  const score = plo ? evaluateOmaha : (h: Card[], b: Card[]) => evaluate([...h, ...b]);
   const dead = new Set<Card>([...hole, ...board]);
-  const lists = ranges.map((r) => rangeCombos(r, dead));
+  const lists = plo ? [] : ranges.map((r) => holdemRange(r, dead));
+  const pools = plo ? ranges.map((r) => omahaPool(r, dead)) : [];
   const need = 5 - board.length;
   const used = new Uint8Array(52);
   const deadArr = [...dead];
-  const scratch: Card[] = new Array(7);
   let total = 0;
   let valid = 0;
 
@@ -70,32 +99,38 @@ export function equityVsRanges(
 
     for (let i = 0; i < ranges.length; i++) {
       const r = ranges[i];
-      const list = lists[i];
       // Postflop narrowing: draw k candidates and keep the best made hand,
       // unless this sample is one of their bluffs.
       const k = rand() < r.bluffy ? 1 : Math.max(1, Math.round(r.narrow + (rand() - 0.5)));
-      let best: Combo | null = null;
+      let best: Card[] | null = null;
       let bestScore = -1;
       for (let t = 0, tries = 0; t < k && tries < 40; tries++) {
-        const c = list[(rand() * list.length) | 0];
-        if (used[c.a] || used[c.b]) continue;
+        let cand: Card[] | null;
+        if (plo) {
+          const c = pools[i][(rand() * pools[i].length) | 0];
+          cand = used[c[0]] || used[c[1]] || used[c[2]] || used[c[3]] ? null : c;
+        } else {
+          const c = lists[i][(rand() * lists[i].length) | 0];
+          cand = used[c.cards[0]] || used[c.cards[1]] ? null : c.cards;
+        }
+        if (!cand) continue;
         t++;
         if (k === 1 || board.length < 3) {
-          best = c;
+          best = cand;
           break;
         }
-        const sc = evaluate([c.a, c.b, ...board]);
+        const sc = score(cand, board);
         if (sc > bestScore) {
           bestScore = sc;
-          best = c;
+          best = cand;
         }
       }
       if (!best) {
         ok = false;
         break;
       }
-      used[best.a] = used[best.b] = 1;
-      opp.push([best.a, best.b]);
+      for (const c of best) used[c] = 1;
+      opp.push(best);
     }
     if (!ok) continue;
 
@@ -109,12 +144,11 @@ export function equityVsRanges(
       full.push(c);
     }
 
-    scratch.length = 0;
-    const hero = evaluate([...hole, ...full]);
+    const hero = score(hole, full);
     let ties = 1;
     let lost = false;
     for (const o of opp) {
-      const v = evaluate([o[0], o[1], ...full]);
+      const v = score(o, full);
       if (v > hero) {
         lost = true;
         break;

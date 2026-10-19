@@ -68,7 +68,9 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
   const la = legalActions(h);
   const bb = h.bigBlind;
   const pos = positionOf(h, seat);
-  const hp = preflopPct(me.hole[0], me.hole[1]);
+  const hp = preflopPct(me.hole);
+  // Omaha hands run closer in equity, so everyone plays more of them
+  const wide = h.variant === 'plo' ? 1.45 : 1;
   const acts = h.actions.filter((a) => a.street === 'preflop' && a.type !== 'post');
   const raises = acts.filter((a) => a.type === 'raise').length;
   const limpers = raises === 0 ? acts.filter((a) => a.type === 'call').length : 0;
@@ -93,8 +95,8 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
     return fold('short stack, not strong enough to shove');
   }
 
-  const openPct = clamp((p.pfr / 100) * mult, 0.02, 0.85);
-  const playPct = clamp((p.vpip / 100) * mult, openPct, 0.95);
+  const openPct = clamp((p.pfr / 100) * mult * wide, 0.02, 0.85);
+  const playPct = clamp((p.vpip / 100) * mult * wide, openPct, 0.95);
 
   if (raises === 0) {
     if (pos === 'BB') {
@@ -130,7 +132,7 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
   const toCallFrac = la.callAmount / (me.stack + 1);
 
   if (raises === 1) {
-    const threeBetPct = clamp((p.threeBet / 100) * (pos === 'BTN' || pos === 'SB' || pos === 'BB' ? 1.2 : 0.9), 0.015, 0.4);
+    const threeBetPct = clamp(((p.threeBet * wide) / 100) * (pos === 'BTN' || pos === 'SB' || pos === 'BB' ? 1.2 : 0.9), 0.015, 0.4);
     // value range scales with how wide the raiser is
     const valueLine = threeBetPct * clamp(raiserRange / 0.2, 0.6, 1.8);
     if (la.canRaise && hp <= jitter(valueLine)) {
@@ -158,7 +160,7 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
   if (la.canRaise && hp <= jitter(valueLine, 0.1)) {
     return raiseTo(raises >= 3 ? la.maxRaiseTo : h.currentBet * 2.3, raises >= 3 ? 'jams over the 4-bet' : '4-bet');
   }
-  let callPct = (raises >= 3 ? 0.02 : amOriginalRaiser ? 0.07 : 0.035) / p.stickiness;
+  let callPct = ((raises >= 3 ? 0.02 : amOriginalRaiser ? 0.07 : 0.035) * wide * wide) / p.stickiness;
   callPct *= clamp(raiserRange / 0.06, 0.7, 2.2);
   if (toCallFrac > 0.35) callPct *= 0.6;
   if (hp <= jitter(callPct)) return call(raises >= 3 ? 'calls the 4-bet' : 'calls the 3-bet');
@@ -166,6 +168,11 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
 }
 
 function isBluffable3bet(hole: Card[]) {
+  if (hole.length > 2) {
+    // Omaha: suited ace (nut-flush blocker) or a connected rundown
+    const ace = hole.find((c) => rankOf(c) === 12);
+    return ace !== undefined && hole.some((c) => c !== ace && suitOf(c) === suitOf(ace));
+  }
   const [a, b] = hole;
   const suited = suitOf(a) === suitOf(b);
   const hi = Math.max(rankOf(a), rankOf(b));
@@ -247,7 +254,8 @@ function postflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotC
   const opps = h.players.filter((o) => o.seat !== seat && !o.folded && !o.sittingOut);
   const nOpp = opps.length;
   const beliefs = opps.map((o) => beliefFor(h, o.seat, ctx.stats));
-  const E = equityVsRanges(me.hole, h.board, beliefs, nOpp > 2 ? 500 : 800);
+  const sims = h.variant === 'plo' ? (nOpp > 2 ? 180 : 300) : nOpp > 2 ? 500 : 800;
+  const E = equityVsRanges(me.hole, h.board, beliefs, sims, h.variant);
   const pot = potTotal(h);
   const street = h.street;
   const draw = drawStrength(me.hole, h.board);
@@ -329,6 +337,13 @@ function lastStreetBetBy(h: HandState, seat: number, street: string) {
 /** 0..1 rough strength of draws (flush/straight) — used for semi-bluffing and realisation. */
 export function drawStrength(hole: Card[], board: Card[]): number {
   if (board.length >= 5) return 0;
+  if (hole.length > 2) {
+    // Omaha: draws must use exactly two hole cards, so take the best pair
+    let best = 0;
+    for (let a = 0; a < hole.length; a++)
+      for (let b = a + 1; b < hole.length; b++) best = Math.max(best, drawStrength([hole[a], hole[b]], board));
+    return best;
+  }
   const all = [...hole, ...board];
   const suits = [0, 0, 0, 0];
   for (const c of all) suits[suitOf(c)]++;

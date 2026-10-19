@@ -106,7 +106,7 @@ function HandDetail({ entry: e, onBack, onClose }: { entry: HistoryEntry; onBack
               .map((l, i) => (
                 <li key={i}>
                   {l.text}
-                  {l.note && <div className="hd-note">{l.note}</div>}
+                  {l.note && l.note !== 'folds preflop' && <div className="hd-note">{l.note}</div>}
                 </li>
               ))}
           </ol>
@@ -197,12 +197,13 @@ export function StatsSheet({ session, onClose }: { session: Session; onClose: ()
 
 interface SettingsProps {
   prefs: Prefs;
+  variant: 'holdem' | 'plo';
   onPrefs: (p: Prefs) => void;
-  onNewSession: (lineup: 'default' | 'random') => void;
+  onNewSession: (lineup: 'default' | 'random', game?: 'holdem' | 'plo') => void;
   onClose: () => void;
 }
 
-export function SettingsSheet({ prefs, onPrefs, onNewSession, onClose }: SettingsProps) {
+export function SettingsSheet({ prefs, variant, onPrefs, onNewSession, onClose }: SettingsProps) {
   const toggle = (k: 'showOdds' | 'revealStyles' | 'autoDeal', label: string, hint: string) => (
     <label className="toggle">
       <span>
@@ -214,6 +215,21 @@ export function SettingsSheet({ prefs, onPrefs, onNewSession, onClose }: Setting
   );
   return (
     <Sheet title="Settings" onClose={onClose}>
+      <div className="field">
+        <span>Game</span>
+        <div className="seg">
+          <button className={variant === 'holdem' ? 'on' : ''} onClick={() => variant !== 'holdem' && onNewSession('default', 'holdem')}>
+            No-limit Hold'em
+          </button>
+          <button className={variant === 'plo' ? 'on' : ''} onClick={() => variant !== 'plo' && onNewSession('default', 'plo')}>
+            Pot-limit Omaha
+          </button>
+        </div>
+        <p className="fine">
+          Omaha deals four cards each. Your hand must use exactly two of them with three from the board. Switching starts a
+          new session.
+        </p>
+      </div>
       <div className="field">
         <span>Bot speed</span>
         <div className="seg">
@@ -229,7 +245,7 @@ export function SettingsSheet({ prefs, onPrefs, onNewSession, onClose }: Setting
       {toggle('autoDeal', 'Deal next hand automatically', 'Otherwise tap to deal.')}
       <div className="field">
         <span>New session</span>
-        <p className="fine">Resets stacks and stats. Hand history is kept.</p>
+        <p className="fine">Resets stacks and stats for the current game. Hand history is kept.</p>
         <div className="seg">
           <button onClick={() => onNewSession('default')}>One of each style</button>
           <button onClick={() => onNewSession('random')}>Random table</button>

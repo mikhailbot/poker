@@ -1,5 +1,6 @@
 import { type Card, cardToString, shuffledDeck } from './cards';
-import { evaluate, handName } from './evaluator';
+import { describeScore } from './evaluator';
+import { HOLE_CARDS, scoreHand, type Variant } from './omaha';
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river';
 export type ActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'post';
@@ -47,6 +48,8 @@ export interface Showdown {
 
 export interface HandState {
   handId: number;
+  /** Texas hold'em (no-limit) or Pot-limit Omaha. */
+  variant: Variant;
   button: number;
   sbSeat: number;
   bbSeat: number;
@@ -117,6 +120,7 @@ export function startHand(
   bigBlind: number,
   handId: number,
   deck: Card[] = shuffledDeck(),
+  variant: Variant = 'holdem',
 ): HandState {
   const players: Player[] = seats.map((s, i) => ({
     seat: i,
@@ -135,6 +139,7 @@ export function startHand(
 
   const h: HandState = {
     handId,
+    variant,
     button,
     sbSeat: -1,
     bbSeat: -1,
@@ -172,8 +177,8 @@ export function startHand(
     h.bbSeat = nextSeat(h, h.sbSeat, (p) => !p.sittingOut);
   }
 
-  // Deal two cards each, starting left of the button
-  for (let round = 0; round < 2; round++) {
+  // Deal hole cards one at a time, starting left of the button
+  for (let round = 0; round < HOLE_CARDS[variant]; round++) {
     let s = h.button;
     for (let k = 0; k < active.length; k++) {
       s = nextSeat(h, s, (p) => !p.sittingOut);
@@ -206,7 +211,9 @@ function post(h: HandState, seat: number, amount: number) {
 export function legalActions(h: HandState): LegalActions {
   const p = h.players[h.toAct];
   const toCall = Math.min(h.currentBet - p.bet, p.stack);
-  const maxRaiseTo = p.bet + p.stack;
+  const allInTo = p.bet + p.stack;
+  // Pot limit: raise to at most current bet + pot after calling
+  const maxRaiseTo = h.variant === 'plo' ? Math.min(allInTo, h.currentBet + potTotal(h) + toCall) : allInTo;
   const minRaiseTo = Math.min(h.currentBet + h.lastRaiseSize, maxRaiseTo);
   // Can raise if action is open to this player and they have chips beyond a call
   const othersCanRespond = h.players.some((o) => o.seat !== p.seat && canAct(o));
@@ -343,9 +350,9 @@ function finish(h: HandState) {
     }
     const scores = new Map<number, number>();
     for (const p of contenders) {
-      const score = evaluate([...p.hole, ...h.board]);
+      const score = scoreHand(h.variant, p.hole, h.board);
       scores.set(p.seat, score);
-      h.showdown.push({ seat: p.seat, hole: p.hole, score, label: handName(score) });
+      h.showdown.push({ seat: p.seat, hole: p.hole, score, label: describeScore(score) });
     }
     h.pots = buildPots(h);
     for (const pot of h.pots) {
