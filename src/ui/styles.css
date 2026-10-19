@@ -499,10 +499,9 @@ input:focus-visible {
   color: var(--spades);
 }
 .card-rank {
-  /* System rounded face: an unmistakable Q (the condensed display face made Q look like 0) */
-  font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-variation-settings: 'wdth' 75;
+  font-stretch: 75%;
+  letter-spacing: -0.03em;
 }
 .card-suit {
   font-family: system-ui, sans-serif;
