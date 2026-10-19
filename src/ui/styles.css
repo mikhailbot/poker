@@ -1238,10 +1238,3 @@ input:focus-visible {
 .standalone .sheet {
   max-height: calc(100dvh - var(--safe-top, 0px) - 12px);
 }
-
-/* Installed app: the page never scrolls, so iOS has nothing to slide under the status bar */
-html.standalone,
-html.standalone body {
-  overflow: hidden;
-  overscroll-behavior: none;
-}
