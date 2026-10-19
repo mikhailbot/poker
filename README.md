@@ -13,7 +13,7 @@ npm run build      # static site in dist/
 
 **GitHub Pages:** every push to `main` runs the tests, builds and deploys via `.github/workflows/pages.yml`. One-time setup: repo Settings → Pages → Source: **GitHub Actions**.
 
-**On your iPhone:** open the Pages URL (or deploy `dist/` anywhere static) (Netlify drop, Cloudflare Pages, GitHub Pages), open it in Safari, then Share → Add to Home Screen. It runs full-screen and keeps working offline. Progress is saved in the browser's local storage.
+**On your iPhone:** open the Pages URL in Safari (or deploy `dist/` to any static host), then Share → Add to Home Screen. It runs full-screen and keeps working offline. Progress is saved in the browser's local storage.
 
 ## How the bots work
 
