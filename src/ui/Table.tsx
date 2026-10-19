@@ -155,6 +155,11 @@ function Result({ h }: { h: HandState }) {
 
 // ------------------------------------------------------------ hero
 
+/** Where a starting hand ranks: "top 4%" for strong hands, "bottom 1%" for weak ones. */
+function rankPhrase(pct: number): string {
+  return pct <= 0.5 ? `top ${Math.max(1, Math.round(pct * 100))}%` : `bottom ${Math.max(1, Math.round((1 - pct) * 100))}%`;
+}
+
 function Hero({ h }: { h: HandState }) {
   const me = h.players[0];
   const hole = [...me.hole].sort((a, b) => b - a);
@@ -163,14 +168,13 @@ function Hero({ h }: { h: HandState }) {
     read =
       h.board.length >= 3
         ? describeScore(scoreHand('plo', hole, h.board))
-        : `${describePlo(hole)}, top ${Math.max(1, Math.round(ploPct(hole) * 100))}%`;
+        : `${describePlo(hole)}, ${rankPhrase(ploPct(hole))}`;
   } else if (hole.length === 2) {
     if (h.board.length >= 3) read = describeScore(scoreHand('holdem', hole, h.board));
     else {
       const key = handKey(hole[0], hole[1]);
-      const top = Math.max(1, Math.round(PREFLOP[key][0] * 100));
       const name = key.length === 2 ? `Pocket ${key[0] === 'T' ? '10' : key[0]}s` : `${key.slice(0, 2).replace('T', '10')} ${key[2] === 's' ? 'suited' : 'offsuit'}`;
-      read = `${name}, top ${top}% of hands`;
+      read = `${name}, ${rankPhrase(PREFLOP[key][0])} of hands`;
     }
   }
   const active = !h.done && h.toAct === 0;
