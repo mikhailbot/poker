@@ -4,6 +4,7 @@ import { pct, type PlayerStats } from '../bots/stats';
 import type { HistoryEntry, Prefs } from '../store/persist';
 import type { Session } from '../session';
 import { CardView } from './CardView';
+import { nutsFor } from '../engine/nuts';
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
@@ -154,6 +155,25 @@ function HandDetail({ entry: e, onBack, onClose }: { entry: HistoryEntry; onBack
               <strong>{name(w.seat)}</strong> collects {w.amount}
             </li>
           ))}
+          {(() => {
+            const n = nutsFor(e.variant ?? 'holdem', e.board);
+            if (!n) return null;
+            return (
+              <li className="hd-nuts">
+                The nuts:{' '}
+                {n.cards.length ? (
+                  <span className="hd-board">
+                    {n.cards.map((c) => (
+                      <CardView key={c} card={c} size="sm" />
+                    ))}
+                  </span>
+                ) : (
+                  'the board'
+                )}{' '}
+                {n.label.toLowerCase()}
+              </li>
+            );
+          })()}
         </ol>
       </section>
     </Sheet>

@@ -1,8 +1,10 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { PREFLOP } from '../bots/preflopTable';
 import { PROFILES } from '../bots/profiles';
 import { handKey } from '../engine/cards';
 import { describeScore } from '../engine/evaluator';
 import { scoreHand } from '../engine/omaha';
+import { nutsFor } from '../engine/nuts';
 import { describePlo, ploPct } from '../bots/plo';
 import { drawPct } from '../bots/draw';
 import { type HandState, describeAction, positionOf, potTotal } from '../engine/game';
@@ -141,28 +143,63 @@ function Stage({
 }) {
   const last = [...h.actions].reverse().find((a) => a.type !== 'post');
   const pot = h.done ? h.pots.reduce((s, p) => s + p.amount, 0) : potTotal(h);
+  // Fade the bottom edge of the result when there's more to scroll to
+  const tickerRef = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  const checkOverflow = () => {
+    const t = tickerRef.current;
+    if (t) setMore(t.scrollHeight - t.scrollTop - t.clientHeight > 4);
+  };
+  useLayoutEffect(checkOverflow, [h.done, h.handId, h.actions.length]);
   return (
-    <section className="stage" aria-label="Board">
+    <section className={`stage ${h.done ? 'is-done' : ''} ${more ? 'has-more' : ''}`} aria-label="Board">
       <div className="stage-head">
-        <span className="street">{h.done ? (h.showdown.length ? 'Showdown' : 'Hand over') : streetName(h)}</span>
+        <Progress h={h} />
         <span className="pot">
           <small>Pot</small>
           {pot}
         </span>
       </div>
-      {h.variant === 'draw' ? (
-        <DrawHand h={h} selected={selected} onToggle={onToggle} />
-      ) : (
-        <div className="board">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <CardView key={`${i}-${h.board[i] ?? 'x'}`} card={h.board[i]} size="lg" delay={i < 3 ? i * 70 : 0} />
-          ))}
+      <div className="tray">
+        {h.variant === 'draw' ? (
+          <DrawHand h={h} selected={selected} onToggle={onToggle} />
+        ) : (
+          <div className="board">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <CardView key={`${i}-${h.board[i] ?? 'x'}`} card={h.board[i]} size="lg" delay={i < 3 ? i * 70 : 0} />
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="ticker" aria-live="polite" ref={tickerRef} onScroll={checkOverflow}>
+        <div className="ticker-inner">
+          {h.done ? <Result h={h} revealMucked={revealMucked} /> : last ? describeAction(h, last) : `Blinds ${h.smallBlind}/${h.bigBlind}`}
         </div>
-      )}
-      <div className="ticker" aria-live="polite">
-        {h.done ? <Result h={h} revealMucked={revealMucked} /> : last ? describeAction(h, last) : `Blinds ${h.smallBlind}/${h.bigBlind}`}
       </div>
     </section>
+  );
+}
+
+/** Where the hand is: a label plus one segment per betting round or draw. */
+function Progress({ h }: { h: HandState }) {
+  const steps =
+    h.variant === 'draw'
+      ? 1 + 2 * h.draws // bet, then draw + bet for each draw
+      : 4;
+  let at: number;
+  if (h.variant === 'draw') at = h.street === 'preflop' ? 0 : h.street === 'draw' ? 1 + 2 * h.drawsDone : 2 * h.drawsDone;
+  else at = ['preflop', 'flop', 'turn', 'river'].indexOf(h.street);
+  if (h.done) at = steps; // all complete
+  const label = h.done ? (h.showdown.length ? 'Showdown' : 'Hand over') : streetName(h);
+  return (
+    <span className="progress">
+      <span className="street">{label}</span>
+      <span className="steps" aria-hidden>
+        {Array.from({ length: steps }, (_, i) => (
+          <i key={i} className={i < at ? 'past' : i === at ? 'now' : ''} />
+        ))}
+      </span>
+    </span>
   );
 }
 
@@ -229,6 +266,7 @@ function Result({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
           </div>
         );
       })}
+      <NutsLine h={h} />
       {losers.length > 0 && (
         <ul className="losers">
           {losers.map((sd) => (
@@ -244,6 +282,34 @@ function Result({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** The best hand possible on this board, and whether anyone held it. */
+function NutsLine({ h }: { h: HandState }) {
+  const nuts = nutsFor(h.variant, h.board);
+  if (!nuts) return null;
+  const holders = h.showdown.filter((sd) => sd.score === nuts.score).map((sd) => sd.seat);
+  // Players who won without a showdown still count if their cards make the nuts
+  if (holders.length === 0)
+    for (const p of h.players)
+      if (!p.folded && !p.sittingOut && scoreHand(h.variant, p.hole, h.board) === nuts.score) holders.push(p.seat);
+  const names = holders.map((s) => (h.players[s].isHuman ? 'You' : h.players[s].name));
+  return (
+    <div className="nuts">
+      <span className="nuts-tag">The nuts</span>
+      {nuts.cards.length > 0 ? (
+        <span className="loser-cards">
+          {nuts.cards.map((c) => (
+            <CardView key={c} card={c} size="xs" />
+          ))}
+        </span>
+      ) : (
+        <span className="nuts-board">the board</span>
+      )}
+      <span className="nuts-label">{nuts.label}</span>
+      {names.length > 0 && <span className="nuts-who">{names.join(' and ')} had it</span>}
     </div>
   );
 }
