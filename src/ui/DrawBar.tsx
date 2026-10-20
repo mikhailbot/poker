@@ -18,19 +18,22 @@ export function DrawBar({ hand: h, selected, onSelect, onDraw, showHint }: Props
   const matchesPlan = n === plan.discard.length && plan.discard.every((i) => selected.has(i));
   return (
     <div className="drawbar">
-      <p className="draw-hint">Tap the cards you want to swap, then draw.</p>
-      {showHint && (
-        <div className="draw-tip">
-          <span>
-            Usual play: <b>{plan.why}</b>
-          </span>
-          {!matchesPlan && (
-            <button className="tip-btn" onClick={() => onSelect(new Set(plan.discard))}>
-              Use it
-            </button>
-          )}
-        </div>
-      )}
+      <div className="slot">
+        {showHint ? (
+          <div className="draw-tip">
+            <span>
+              Usual play: <b>{plan.why}</b>
+            </span>
+            {!matchesPlan && (
+              <button className="tip-btn" onClick={() => onSelect(new Set(plan.discard))}>
+                Use it
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="draw-hint">Tap the cards you want to swap, then draw.</p>
+        )}
+      </div>
       <div className="buttons">
         <button className="btn btn-fold" onClick={() => onDraw([])}>
           Stand pat

@@ -94,8 +94,10 @@ function Opponents({ h, session, revealStyles, revealMucked, thinking }: { h: Ha
               {h.button === i && <b className="dealer">D</b>}
             </div>
             <div className="opp-name">{seat.name}</div>
-            <div className="opp-stack">{p.stack === 0 && p.allIn ? 'All-in' : p.stack}</div>
-            <div className="opp-pos">{positionOf(h, i)}</div>
+            <div className="opp-line">
+              <span className="opp-stack">{p.stack === 0 && p.allIn ? 'All-in' : p.stack}</span>
+              <span className="opp-pos">{positionOf(h, i)}</span>
+            </div>
             {h.variant === 'draw' && <div className="opp-drew">{!p.folded ? drawWords(h, i) ?? '' : ''}</div>}
             <div className="opp-status">
               {reveal || mucked ? (
@@ -266,7 +268,6 @@ function Result({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
           </div>
         );
       })}
-      <NutsLine h={h} />
       {losers.length > 0 && (
         <ul className="losers">
           {losers.map((sd) => (
@@ -287,7 +288,7 @@ function Result({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
 }
 
 /** The best hand possible on this board, and whether anyone held it. */
-function NutsLine({ h }: { h: HandState }) {
+export function NutsLine({ h }: { h: HandState }) {
   const nuts = nutsFor(h.variant, h.board);
   if (!nuts) return null;
   const holders = h.showdown.filter((sd) => sd.score === nuts.score).map((sd) => sd.seat);
@@ -331,7 +332,7 @@ function handRead(h: HandState, holeIn: number[]): string {
   }
   if (hole.length === 5) {
     const made = describeScore(scoreHand('draw', hole, []));
-    return h.street === 'preflop' && !h.done ? `${made}, ${rankPhrase(drawPct(hole))} of hands` : made;
+    return h.street === 'preflop' && !h.done ? `${made}, ${rankPhrase(drawPct(hole))}` : made;
   }
   if (hole.length !== 2) return '';
   if (h.board.length >= 3) return describeScore(scoreHand('holdem', hole, h.board));
@@ -340,7 +341,7 @@ function handRead(h: HandState, holeIn: number[]): string {
     key.length === 2
       ? `Pocket ${key[0] === 'T' ? '10' : key[0]}s`
       : `${key.slice(0, 2).replace('T', '10')} ${key[2] === 's' ? 'suited' : 'offsuit'}`;
-  return `${name}, ${rankPhrase(PREFLOP[key][0])} of hands`;
+  return `${name}, ${rankPhrase(PREFLOP[key][0])}`;
 }
 
 function Hero({ h }: { h: HandState }) {

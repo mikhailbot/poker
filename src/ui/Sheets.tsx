@@ -258,7 +258,7 @@ function ConfirmButton({ label, confirmLabel, onConfirm }: { label: string; conf
 }
 
 export function SettingsSheet({ prefs, gameName, onPrefs, onResetGame, onClearHistory, onResetAll, onClose }: SettingsProps) {
-  const toggle = (k: 'showOdds' | 'showChance' | 'revealStyles' | 'revealMucked' | 'autoDeal', label: string, hint: string) => (
+  const toggle = (k: 'showChance' | 'revealStyles' | 'revealMucked' | 'autoDeal', label: string, hint: string) => (
     <label className="toggle">
       <span>
         {label}
@@ -279,8 +279,11 @@ export function SettingsSheet({ prefs, gameName, onPrefs, onResetGame, onClearHi
           ))}
         </div>
       </div>
-      {toggle('showOdds', 'Show what you need to call', 'How often you must win for a call to pay off, based on the price.')}
-      {toggle('showChance', 'Show my chance of winning and hints', 'An estimate against the hands your opponents likely hold, plus the usual way to draw in five-card draw.')}
+      {toggle(
+        'showChance',
+        'Show odds help',
+        'What you need to win to call ("Call 5 to win 10: you need 33%"), your estimated chance of winning, and the usual draw in five-card draw.',
+      )}
       {toggle('revealMucked', 'Show all cards after the hand', 'Reveal the hands of players who folded, so you can see what they had.')}
       {toggle('revealStyles', 'Reveal player styles', 'Label each bot with how it plays. Off is more realistic.')}
       {toggle('autoDeal', 'Deal next hand automatically after you fold', 'Waits a few seconds (longer when cards are shown). Hands you play to the end always wait for you.')}

@@ -7,8 +7,8 @@ import { type Decision, type HandState, legalActions, potTotal } from '../engine
 interface Props {
   hand: HandState;
   stats: PlayerStats[];
-  showOdds: boolean;
-  showChance: boolean;
+  /** Odds help: what you need to call and your estimated chance of winning. */
+  help: boolean;
   onAct: (d: Decision) => void;
 }
 
@@ -22,7 +22,7 @@ function estimateChance(h: HandState, stats: PlayerStats[]): number {
   return equityVsRanges(me.hole, h.board, beliefs, sims, h.variant, drawsLeft);
 }
 
-export function ActionBar({ hand: h, stats, showOdds, showChance, onAct }: Props) {
+export function ActionBar({ hand: h, stats, help, onAct }: Props) {
   const la = legalActions(h);
   const me = h.players[h.toAct];
   const pot = potTotal(h);
@@ -73,98 +73,107 @@ export function ActionBar({ hand: h, stats, showOdds, showChance, onAct }: Props
 
   const potOdds = la.callAmount > 0 ? la.callAmount / (pot + la.callAmount) : 0;
   const chance = useMemo(
-    () => (showChance ? estimateChance(h, stats) : null),
+    () => (help ? estimateChance(h, stats) : null),
     // recompute when the situation changes, not on every render
-    [showChance, h.handId, h.actions.length], // eslint-disable-line react-hooks/exhaustive-deps
+    [help, h.handId, h.actions.length], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const needPct = Math.round(potOdds * 100);
   const chancePct = chance === null ? null : Math.round(chance * 100);
   const opponents = h.players.filter((p) => !p.isHuman && !p.folded).length;
-  const raiseWord = la.isBet ? 'Bet' : 'Raise to';
   const allIn = amount >= me.bet + me.stack;
+  const clampAmt = (v: number) => Math.round(Math.min(la.maxRaiseTo, Math.max(la.minRaiseTo, v)));
+  /** +/− step: one big blind, or a tenth of the pot once pots get big */
+  const step = Math.max(bb, Math.round((pot / 10) / bb) * bb);
 
   return (
     <div className="actionbar">
-      {(showOdds && la.callAmount > 0) || chancePct !== null ? (
-        <div className="odds">
-          {showOdds && la.callAmount > 0 && (
-            <p className="odds-line">
-              Calling {la.callAmount} to win {pot} pays off if you win at least <b>{needPct}%</b> of the time.
-            </p>
-          )}
-          {chancePct !== null && (
-            <div className="chance">
-              <div className="meter" role="img" aria-label={`Your chance about ${chancePct}%, needed ${needPct}%`}>
-                <span className={`meter-fill ${la.callAmount > 0 ? (chancePct >= needPct ? 'ok' : 'short') : ''}`} style={{ width: `${chancePct}%` }} />
-                {la.callAmount > 0 && showOdds && <span className="meter-mark" style={{ left: `${needPct}%` }} />}
-              </div>
-              <span className="chance-text">
-                You win about <b>{chancePct}%</b> vs {opponents === 1 ? '1 player' : `${opponents} players`}
-              </span>
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      {sizing && la.canRaise && (
-        <div className="sizer">
-          <div className="presets">
+      {/* Fixed-height slot above the buttons: odds help, or the bet sizer. Its size never changes. */}
+      <div className="slot">
+        {sizing && la.canRaise ? (
+          <div className="presets" role="group" aria-label="Bet sizes">
             {presets.map((p) => (
               <button key={p.label} className={`preset ${amount === p.to ? 'on' : ''}`} onClick={() => setAmount(p.to)}>
                 {p.label}
               </button>
             ))}
           </div>
-          <div className="slider-row">
+        ) : help && chancePct !== null ? (
+          <div className="odds">
+            <p className="odds-line">
+              {la.callAmount > 0 ? (
+                <>
+                  Call {la.callAmount} to win {pot}: you need <b>{needPct}%</b>
+                </>
+              ) : (
+                'Free to check'
+              )}
+            </p>
+            <div className="chance">
+              <div className="meter" role="img" aria-label={`Your chance about ${chancePct}%${la.callAmount > 0 ? `, needed ${needPct}%` : ''}`}>
+                <span
+                  className={`meter-fill ${la.callAmount > 0 ? (chancePct >= needPct ? 'ok' : 'short') : ''}`}
+                  style={{ width: `${chancePct}%` }}
+                />
+                {la.callAmount > 0 && <span className="meter-mark" style={{ left: `${needPct}%` }} />}
+              </div>
+              <span className="chance-text">
+                You win about <b>{chancePct}%</b> vs {opponents === 1 ? '1 player' : `${opponents} players`}
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {sizing && la.canRaise ? (
+        <div className="buttons sizing">
+          <button className="btn btn-fold" onClick={() => setSizing(false)}>
+            Back
+          </button>
+          <div className="stepper">
+            <button aria-label="Less" onClick={() => setAmount(clampAmt(amount - step))} disabled={amount <= la.minRaiseTo}>
+              −
+            </button>
             <input
-              type="range"
-              min={la.minRaiseTo}
-              max={la.maxRaiseTo}
-              step={1}
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              aria-label="Bet amount"
-            />
-            <input
-              className="amt-input"
               type="number"
               inputMode="numeric"
               value={amount}
               min={la.minRaiseTo}
               max={la.maxRaiseTo}
               onChange={(e) => setAmount(Number(e.target.value) || la.minRaiseTo)}
+              onBlur={() => setAmount(clampAmt(amount))}
               aria-label="Bet amount in chips"
             />
+            <button aria-label="More" onClick={() => setAmount(clampAmt(amount + step))} disabled={amount >= la.maxRaiseTo}>
+              +
+            </button>
           </div>
+          <button className="btn btn-raise" onClick={() => onAct({ type: 'raise', to: clampAmt(amount) })}>
+            {allIn ? `All-in ${amount}` : `${la.isBet ? 'Bet' : 'Raise to'} ${amount}`}
+          </button>
         </div>
-      )}
-
-      <div className="buttons">
-        {la.canFold && (
-          <button className="btn btn-fold" onClick={() => onAct({ type: 'fold' })}>
-            Fold
-          </button>
-        )}
-        {la.canCheck ? (
-          <button className="btn btn-call" onClick={() => onAct({ type: 'check' })}>
-            Check
-          </button>
-        ) : (
-          <button className="btn btn-call" onClick={() => onAct({ type: 'call' })}>
-            {la.callAmount >= me.stack ? `Call all-in ${la.callAmount}` : `Call ${la.callAmount}`}
-          </button>
-        )}
-        {la.canRaise &&
-          (sizing ? (
-            <button className="btn btn-raise" onClick={() => onAct({ type: 'raise', to: amount })}>
-              {allIn ? `All-in ${amount}` : `${raiseWord} ${amount}`}
+      ) : (
+        <div className="buttons">
+          {la.canFold && (
+            <button className="btn btn-fold" onClick={() => onAct({ type: 'fold' })}>
+              Fold
+            </button>
+          )}
+          {la.canCheck ? (
+            <button className="btn btn-call" onClick={() => onAct({ type: 'check' })}>
+              Check
             </button>
           ) : (
+            <button className="btn btn-call" onClick={() => onAct({ type: 'call' })}>
+              {la.callAmount >= me.stack ? `Call all-in ${la.callAmount}` : `Call ${la.callAmount}`}
+            </button>
+          )}
+          {la.canRaise && (
             <button className="btn btn-raise" onClick={() => setSizing(true)}>
               {la.isBet ? 'Bet' : 'Raise'}
             </button>
-          ))}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

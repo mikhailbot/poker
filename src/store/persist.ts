@@ -9,10 +9,9 @@ const MAX_HISTORY = 300;
 
 export interface Prefs {
   speed: 'relaxed' | 'normal' | 'fast';
-  showOdds: boolean;
   revealStyles: boolean;
   autoDeal: boolean;
-  /** Show your estimated chance of winning next to the pot odds. */
+  /** Odds help: what you need to call, your chance of winning, and draw hints. */
   showChance: boolean;
   /** After a hand, show the cards of players who folded or lost without showing. */
   revealMucked: boolean;
@@ -22,7 +21,6 @@ export interface Prefs {
 
 export const DEFAULT_PREFS: Prefs = {
   speed: 'normal',
-  showOdds: true,
   revealStyles: false,
   autoDeal: true,
   showChance: true,
