@@ -1509,3 +1509,40 @@ button.card {
   background: var(--down);
   color: #fff;
 }
+
+/* Your chip count: as prominent as the opponents' stacks */
+.hero-stack {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-left: 8px;
+  line-height: 1;
+}
+.hero-stack-num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+}
+.hero-stack-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.hero.folded .hero-stack-num {
+  color: var(--ink);
+}
+.is-plo .hero-stack-num {
+  font-size: 22px;
+}
+/* Omaha: four cards leave no room beside them, so the hand read goes underneath */
+.is-plo .hero {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.is-plo .hero-info {
+  order: 3;
+  flex-basis: 100%;
+}

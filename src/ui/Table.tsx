@@ -286,9 +286,6 @@ function Hero({ h }: { h: HandState }) {
         <div className="hero-read">{me.folded ? 'You folded' : read}</div>
         <div className="hero-meta">
           <span className="hero-pos">{positionOf(h, 0)}</span>
-          <span>
-            Stack <b>{me.stack}</b>
-          </span>
           {me.bet > 0 && !h.done && (
             <span>
               In <b>{me.bet}</b>
@@ -297,6 +294,10 @@ function Hero({ h }: { h: HandState }) {
           {h.variant === 'draw' && drawWords(h, 0) && <span className="hero-drew">{drawWords(h, 0) === 'Stood pat' ? 'You stood pat' : `You drew ${drawWords(h, 0)!.slice(5)}`}</span>}
           {h.button === 0 && <span className="dealer inline">D</span>}
         </div>
+      </div>
+      <div className="hero-stack" aria-label={`Your chips: ${me.stack}`}>
+        <span className="hero-stack-num">{me.stack === 0 && me.allIn ? 'All-in' : me.stack}</span>
+        <span className="hero-stack-label">your chips</span>
       </div>
     </section>
   );
