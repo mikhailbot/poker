@@ -59,16 +59,28 @@ export function HistorySheet({ history, onClose }: { history: HistoryEntry[]; on
 }
 
 const STREET_LABEL: Record<string, string> = { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' };
-const DRAW_LABEL: Record<string, string> = { preflop: 'Before the draw', draw: 'The draw', river: 'After the draw' };
+/** Five-card draw streets in order, with headings, for a hand with `draws` draws. */
+function drawStreets(draws: number): { id: string; label: string }[] {
+  const betting = draws >= 3 ? ['flop', 'turn', 'river'] : draws === 2 ? ['turn', 'river'] : ['river'];
+  const out = [{ id: 'preflop', label: draws > 1 ? 'Before draw 1' : 'Before the draw' }];
+  for (let k = 1; k <= draws; k++) {
+    out.push({ id: `draw${k}`, label: draws > 1 ? `Draw ${k}` : 'The draw' });
+    out.push({ id: betting[k - 1], label: draws > 1 ? `After draw ${k}` : 'After the draw' });
+  }
+  return out;
+}
 const boardFor = (street: string, board: number[]) =>
   street === 'flop' ? board.slice(0, 3) : street === 'turn' ? board.slice(3, 4) : street === 'river' ? board.slice(4, 5) : [];
 
 function HandDetail({ entry: e, onBack, onClose }: { entry: HistoryEntry; onBack: () => void; onClose: () => void }) {
   const isDraw = e.variant === 'draw';
-  const labels = isDraw ? DRAW_LABEL : STREET_LABEL;
-  const streets = (isDraw ? ['preflop', 'draw', 'river'] : ['preflop', 'flop', 'turn', 'river']).filter((s) =>
-    e.lines.some((l) => l.street === s),
-  );
+  const order = isDraw
+    ? drawStreets(e.draws ?? 1)
+    : ['preflop', 'flop', 'turn', 'river'].map((id) => ({ id, label: STREET_LABEL[id] }));
+  // older saved draw hands used plain 'draw' for the draw lines
+  const lineStreet = (st: string) => (isDraw && st === 'draw' ? 'draw1' : st);
+  const labels: Record<string, string> = Object.fromEntries(order.map((o) => [o.id, o.label]));
+  const streets = order.map((o) => o.id).filter((id) => e.lines.some((l) => lineStreet(l.street) === id));
   const name = (seat: number) => e.players.find((p) => p.seat === seat)?.name ?? '';
   return (
     <Sheet title={`Hand #${e.id}`} onClose={onClose}>
@@ -107,7 +119,7 @@ function HandDetail({ entry: e, onBack, onClose }: { entry: HistoryEntry; onBack
           </h3>
           <ol>
             {e.lines
-              .filter((l) => l.street === s)
+              .filter((l) => lineStreet(l.street) === s)
               .map((l, i) => (
                 <li key={i}>
                   {l.text}

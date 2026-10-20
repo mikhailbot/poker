@@ -25,6 +25,8 @@ export interface Settings {
   lineup: string[] | 'random';
   /** Which preset line-up this is, for the settings screen. */
   table?: TableKind;
+  /** Five-card draw: number of draws per hand (1-3). */
+  draws?: number;
 }
 
 /** Table line-ups: which five personalities sit with you. */
@@ -123,6 +125,7 @@ export function dealNext(s: Session): HandState {
     s.handCount,
     undefined,
     s.settings.variant ?? 'holdem',
+    s.settings.draws ?? 2,
   );
   if (s.hand.done) finishHand(s);
   return s.hand;

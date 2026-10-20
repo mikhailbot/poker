@@ -21,9 +21,9 @@ export const GAMES: { id: Variant; name: string; short: string; cards: number; a
   {
     id: 'draw',
     name: 'Five-card draw',
-    short: '5-card draw',
+    short: 'Draw',
     cards: 5,
-    about: 'Five cards each and no board. Bet, swap any cards once, then bet again.',
+    about: 'Five cards each and no board. Swap cards between betting rounds, with one to three draws.',
   },
 ];
 
@@ -39,6 +39,8 @@ interface Props {
   table: TableKind;
   summaries: Partial<Record<Variant, { hands: number; netBB: number } | null>>;
   onPickGame: (g: Variant) => void;
+  drawRounds: number;
+  onDrawRounds: (n: number) => void;
   onNewTable: (t: TableKind) => void;
   onClose: () => void;
 }
@@ -57,7 +59,7 @@ function Fan({ n }: { n: number }) {
 
 const fmt = (bb: number) => `${bb > 0 ? '+' : bb < 0 ? '−' : ''}${Math.abs(bb).toFixed(1)} BB`;
 
-export function GamePicker({ current, table, summaries, onPickGame, onNewTable, onClose }: Props) {
+export function GamePicker({ current, table, summaries, onPickGame, drawRounds, onDrawRounds, onNewTable, onClose }: Props) {
   const [pick, setPick] = useState<TableKind>(table);
   const gameName = GAMES.find((g) => g.id === current)!.name;
   return (
@@ -92,6 +94,21 @@ export function GamePicker({ current, table, summaries, onPickGame, onNewTable, 
         })}
       </ul>
       <p className="fine">Each game keeps its own stacks and stats, so you can switch back and forth.</p>
+
+      <h3 className="picker-h">Draws in five-card draw</h3>
+      <div className="seg">
+        {[1, 2, 3].map((n) => (
+          <button key={n} className={drawRounds === n ? 'on' : ''} onClick={() => onDrawRounds(n)}>
+            {n === 1 ? '1 draw' : `${n} draws`}
+          </button>
+        ))}
+      </div>
+      <p className="fine">
+        {drawRounds === 1
+          ? 'Classic draw: one chance to swap cards.'
+          : `A betting round after each of ${drawRounds} draws.`}{' '}
+        {current === 'draw' ? 'Applies from the next hand.' : ''}
+      </p>
 
       <h3 className="picker-h">Who's at the table</h3>
       <div className="tables" role="radiogroup" aria-label="Table">

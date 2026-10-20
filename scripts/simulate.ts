@@ -9,7 +9,7 @@ import { botAct, createSession, dealNext, DEFAULT_SETTINGS } from '../src/sessio
 const HANDS = Number(process.argv[2] ?? 3000);
 const VARIANT = (process.argv[3] ?? 'holdem') as 'holdem' | 'plo' | 'draw';
 const lineup = ['nit', 'tag', 'lag', 'station', 'maniac', 'tag'];
-const s = createSession({ ...DEFAULT_SETTINGS, lineup, variant: VARIANT }, 'x', false);
+const s = createSession({ ...DEFAULT_SETTINGS, lineup, variant: VARIANT, draws: Number(process.argv[4] ?? 2) }, 'x', false);
 // force one of each profile into fixed seats
 s.seats.forEach((seat, i) => (seat.profileId = lineup[i]));
 

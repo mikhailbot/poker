@@ -55,6 +55,8 @@ export function App() {
   const sessionRef = useRef<Session>(loadSession() ?? createSession());
   const [, rerender] = useReducer((x: number) => x + 1, 0);
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
   const [history, setHistory] = useState(loadHistory);
   const [panel, setPanel] = useState<Panel>(null);
   const [thinking, setThinking] = useState(0);
@@ -79,6 +81,7 @@ export function App() {
   const deal = useCallback(() => {
     const sess = sessionRef.current;
     if (!canDeal(sess)) return;
+    sess.settings.draws = prefsRef.current.drawRounds;
     dealNext(sess);
     setHeld(false);
     setPicked(new Set());
@@ -323,6 +326,8 @@ export function App() {
           current={variant}
           table={s.settings.table ?? 'mixed'}
           summaries={{ holdem: sessionSummary('holdem'), plo: sessionSummary('plo'), draw: sessionSummary('draw') }}
+          drawRounds={prefs.drawRounds}
+          onDrawRounds={(n) => updatePrefs({ ...prefs, drawRounds: n })}
           onPickGame={switchGame}
           onNewTable={newTable}
           onClose={() => setPanel(null)}

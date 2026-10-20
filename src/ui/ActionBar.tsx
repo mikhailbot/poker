@@ -17,9 +17,9 @@ function estimateChance(h: HandState, stats: PlayerStats[]): number {
   const me = h.players[h.toAct];
   const opps = h.players.filter((p) => p.seat !== me.seat && !p.folded && !p.sittingOut);
   const beliefs = opps.map((o) => beliefFor(h, o.seat, stats));
-  const drawn = h.actions.some((a) => a.seat === me.seat && a.type === 'draw');
+  const drawsLeft = h.variant === 'draw' ? h.draws - h.drawsDone : 0;
   const sims = h.variant === 'plo' ? 300 : h.variant === 'draw' ? 500 : 900;
-  return equityVsRanges(me.hole, h.board, beliefs, sims, h.variant, drawn);
+  return equityVsRanges(me.hole, h.board, beliefs, sims, h.variant, drawsLeft);
 }
 
 export function ActionBar({ hand: h, stats, showOdds, showChance, onAct }: Props) {

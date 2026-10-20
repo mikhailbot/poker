@@ -16,6 +16,8 @@ export interface Action {
   amount: number;
   street: Street;
   allIn: boolean;
+  /** Five-card draw: which draw (1, 2, 3) a 'draw' action belongs to. */
+  round?: number;
 }
 
 export interface Player {
@@ -81,6 +83,9 @@ export interface HandState {
   startStacks: number[];
   /** Five-card draw: discarded cards, reshuffled if the deck runs out. */
   muck: Card[];
+  /** Five-card draw: how many draws this hand has, and how many are done. */
+  draws: number;
+  drawsDone: number;
 }
 
 export interface SeatConfig {
@@ -127,6 +132,7 @@ export function startHand(
   handId: number,
   deck: Card[] = shuffledDeck(),
   variant: Variant = 'holdem',
+  draws = 1,
 ): HandState {
   const players: Player[] = seats.map((s, i) => ({
     seat: i,
@@ -167,6 +173,8 @@ export function startHand(
     net: players.map(() => 0),
     startStacks: players.map((p) => p.stack),
     muck: [],
+    draws: variant === 'draw' ? Math.max(1, Math.min(3, draws)) : 0,
+    drawsDone: 0,
   };
 
   const active = players.filter((p) => !p.sittingOut);
@@ -350,24 +358,38 @@ const resetBetting = (h: HandState) => {
   h.lastAggressor = -1;
 };
 
-/** Five-card draw: betting -> drawing round -> betting -> showdown. */
+/**
+ * Five-card draw: betting, then a draw, then betting, repeated for each draw.
+ * The betting rounds after each draw reuse the street names so the last one is
+ * always 'river': one draw -> river; two -> turn, river; three -> flop, turn, river.
+ */
+export const drawBettingStreets = (draws: number): Street[] =>
+  draws >= 3 ? ['flop', 'turn', 'river'] : draws === 2 ? ['turn', 'river'] : ['river'];
+
+function startDrawRound(h: HandState) {
+  h.street = 'draw';
+  resetBetting(h);
+  // Everyone still in draws, including all-in players, starting left of the button
+  h.toAct = nextSeat(h, h.button, inHand);
+}
+
 function advanceDraw(h: HandState) {
-  if (h.street === 'preflop') {
-    h.street = 'draw';
-    resetBetting(h);
-    // Everyone still in draws, including all-in players, starting left of the button
-    h.toAct = nextSeat(h, h.button, inHand);
-    return;
-  }
-  if (h.street === 'draw') {
-    h.street = 'river';
+  while (true) {
+    if (h.street !== 'draw') {
+      // A betting round just finished (or was skipped)
+      if (h.drawsDone < h.draws) return startDrawRound(h);
+      return finish(h);
+    }
+    // Everyone has drawn: next betting round
+    h.drawsDone++;
+    h.street = drawBettingStreets(h.draws)[h.drawsDone - 1];
     resetBetting(h);
     if (h.players.filter(canAct).length >= 2) {
       h.toAct = nextSeat(h, h.button, canAct);
       return;
     }
+    // Fewer than two can bet (all-ins): keep drawing or go to showdown
   }
-  finish(h);
 }
 
 function drawCard(h: HandState): Card {
@@ -394,7 +416,7 @@ export function applyDraw(h: HandState, discardIdx: number[]): void {
   for (const i of idx) p.hole[i] = drawCard(h);
   h.muck.push(...thrown);
   p.hasActed = true;
-  h.actions.push({ seat: p.seat, type: 'draw', amount: idx.length, street: 'draw', allIn: p.allIn });
+  h.actions.push({ seat: p.seat, type: 'draw', amount: idx.length, street: 'draw', allIn: p.allIn, round: h.drawsDone + 1 });
   const next = nextSeat(h, p.seat, (o) => inHand(o) && !o.hasActed);
   if (next === -1 || next === p.seat) advanceDraw(h);
   else h.toAct = next;

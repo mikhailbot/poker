@@ -246,7 +246,7 @@ export function beliefFor(h: HandState, v: number, stats: PlayerStats[]): RangeB
   if (pv.bet > 0 && pv.bet > 0.8 * pot) narrow += 0.6;
   const bluffy = clamp(0.12 + 0.12 * (s.af - 1.5) + 0.5 * Math.max(0, s.pfr - 0.2), 0.05, 0.55);
   // Five-card draw: how many cards they took tells a lot about their hand
-  const drawAct = h.actions.find((a) => a.seat === v && a.type === 'draw');
+  const drawAct = [...h.actions].reverse().find((a) => a.seat === v && a.type === 'draw');
   return { lo, hi, narrow, bluffy, drew: drawAct ? drawAct.amount : undefined };
 }
 
@@ -259,8 +259,10 @@ function postflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotC
   const nOpp = opps.length;
   const beliefs = opps.map((o) => beliefFor(h, o.seat, ctx.stats));
   const sims = h.variant === 'plo' ? (nOpp > 2 ? 180 : 300) : nOpp > 2 ? 500 : 800;
-  const heroDrawn = h.actions.some((a) => a.seat === seat && a.type === 'draw');
-  const E = equityVsRanges(me.hole, h.board, beliefs, h.variant === 'draw' ? 400 : sims, h.variant, heroDrawn);
+  const drawsLeft = h.variant === 'draw' ? h.draws - h.drawsDone : 0;
+  // More draws to simulate per run means fewer runs needed for the same time budget
+  const drawSims = Math.round(400 / (1 + 0.6 * drawsLeft));
+  const E = equityVsRanges(me.hole, h.board, beliefs, h.variant === 'draw' ? drawSims : sims, h.variant, drawsLeft);
   const pot = potTotal(h);
   const street = h.street;
   const draw = drawStrength(me.hole, h.board);

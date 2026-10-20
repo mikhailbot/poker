@@ -10,15 +10,6 @@ import type { Session } from '../session';
 import { CardView } from './CardView';
 
 const STREET: Record<string, string> = { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' };
-const DRAW_STREET: Record<string, string> = { preflop: 'Before the draw', draw: 'Drawing', river: 'After the draw' };
-const streetName = (h: HandState) => (h.variant === 'draw' ? DRAW_STREET : STREET)[h.street] ?? '';
-
-/** Five-card draw: how many cards a player took, in words. */
-function drawWords(h: HandState, seat: number): string | null {
-  const a = h.actions.find((x) => x.seat === seat && x.type === 'draw');
-  if (!a) return null;
-  return a.amount === 0 ? 'Stood pat' : `Drew ${a.amount}`;
-}
 const VERB: Record<string, string> = { fold: 'Folded', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', post: '' };
 
 /** What a seat did most recently on the current street. */
@@ -27,11 +18,27 @@ function streetAction(h: HandState, seat: number) {
     const a = h.actions[i];
     if (a.seat !== seat) continue;
     if (a.type === 'fold') return { word: 'Folded', kind: 'fold' };
-    if (a.street !== h.street) return null;
+    if (a.street !== h.street || a.type === 'draw') return null; // draw counts are shown on their own line
     if (a.type === 'post') return { word: a.amount === h.smallBlind ? 'SB' : 'BB', kind: 'post' };
     return { word: a.allIn ? 'All-in' : VERB[a.type], kind: a.allIn ? 'allin' : a.type };
   }
   return null;
+}
+
+function streetName(h: HandState): string {
+  if (h.variant !== 'draw') return STREET[h.street] ?? '';
+  const many = h.draws > 1;
+  if (h.street === 'preflop') return many ? 'Before draw 1' : 'Before the draw';
+  if (h.street === 'draw') return many ? `Draw ${h.drawsDone + 1} of ${h.draws}` : 'Drawing';
+  return many ? `After draw ${h.drawsDone}` : 'After the draw';
+}
+
+/** Five-card draw: how many cards a player took in each draw, in words ("Drew 3, 1"). */
+function drawWords(h: HandState, seat: number): string | null {
+  const counts = h.actions.filter((x) => x.seat === seat && x.type === 'draw').map((x) => x.amount);
+  if (counts.length === 0) return null;
+  if (counts.length === 1 && counts[0] === 0) return 'Stood pat';
+  return `Drew ${counts.map((c) => (c === 0 ? 'pat' : c)).join(', ')}`;
 }
 
 interface Props {
@@ -291,7 +298,7 @@ function Hero({ h }: { h: HandState }) {
               In <b>{me.bet}</b>
             </span>
           )}
-          {h.variant === 'draw' && drawWords(h, 0) && <span className="hero-drew">{drawWords(h, 0) === 'Stood pat' ? 'You stood pat' : `You drew ${drawWords(h, 0)!.slice(5)}`}</span>}
+          {h.variant === 'draw' && drawWords(h, 0) && <span className="hero-drew">You {drawWords(h, 0)!.toLowerCase()}</span>}
           {h.button === 0 && <span className="dealer inline">D</span>}
         </div>
       </div>

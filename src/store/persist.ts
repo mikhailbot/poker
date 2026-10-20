@@ -16,6 +16,8 @@ export interface Prefs {
   showChance: boolean;
   /** After a hand, show the cards of players who folded or lost without showing. */
   revealMucked: boolean;
+  /** Five-card draw: draws per hand (1-3). */
+  drawRounds: number;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -25,6 +27,7 @@ export const DEFAULT_PREFS: Prefs = {
   autoDeal: true,
   showChance: true,
   revealMucked: true,
+  drawRounds: 2,
 };
 
 export interface HistoryPlayer {
@@ -50,6 +53,8 @@ export interface HistoryEntry {
   showdown: { seat: number; label: string }[];
   winners: { seat: number; amount: number }[];
   heroNet: number;
+  /** Five-card draw: draws per hand. */
+  draws?: number;
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -138,6 +143,7 @@ export function toHistory(h: HandState, notes: Record<number, string>): HistoryE
   return {
     id: h.handId,
     variant: h.variant,
+    draws: h.draws,
     time: Date.now(),
     bigBlind: h.bigBlind,
     board: h.board,
@@ -154,7 +160,12 @@ export function toHistory(h: HandState, notes: Record<number, string>): HistoryE
         net: h.net[p.seat],
         folded: p.folded,
       })),
-    lines: h.actions.map((a, i) => ({ street: a.street, text: describeAction(h, a), note: notes[i], seat: a.seat })),
+    lines: h.actions.map((a, i) => ({
+      street: a.type === 'draw' ? `draw${a.round ?? 1}` : a.street,
+      text: describeAction(h, a),
+      note: notes[i],
+      seat: a.seat,
+    })),
     showdown: h.showdown.map((x) => ({ seat: x.seat, label: x.label })),
     winners: [...winnings.entries()].map(([seat, amount]) => ({ seat, amount: Math.round(amount) })),
     heroNet: hero ? h.net[hero.seat] : 0,

@@ -82,11 +82,11 @@ export function equityVsRanges(
   ranges: RangeBelief[],
   sims = 700,
   variant: Variant = 'holdem',
-  /** Five-card draw only: has the hero already drawn? */
-  heroDrawn = false,
+  /** Five-card draw only: how many draws are still to come in this hand. */
+  drawsLeft = 0,
 ): number {
   if (ranges.length === 0) return 1;
-  if (variant === 'draw') return equityDraw(hole, ranges, sims, heroDrawn);
+  if (variant === 'draw') return equityDraw(hole, ranges, sims, drawsLeft);
   const plo = variant === 'plo';
   const score = plo ? evaluateOmaha : (h: Card[], b: Card[]) => evaluate([...h, ...b]);
   const dead = new Set<Card>([...hole, ...board]);
@@ -175,14 +175,14 @@ export function equityVsRanges(
  * if they've drawn, consistent with how many cards they took (a pat hand may
  * be a bluff). Sampled once per decision for speed.
  */
-function drawPool(r: RangeBelief, dead: Set<Card>, size = 160): Card[][] {
+function drawPool(r: RangeBelief, dead: Set<Card>, size = 120): Card[][] {
   const lo = Math.max(0, r.lo);
   const hi = Math.min(1, Math.max(r.hi, lo + 0.03));
   const live = Array.from({ length: 52 }, (_, i) => i).filter((c) => !dead.has(c));
   const pool: Card[][] = [];
   const bluffs: Card[][] = []; // stood pat with nothing ("snowing")
   const loose: Card[][] = [];
-  for (let tries = 0; tries < 12000 && pool.length < size; tries++) {
+  for (let tries = 0; tries < 7000 && pool.length < size; tries++) {
     for (let i = 0; i < 5; i++) {
       const j = i + ((rand() * (live.length - i)) | 0);
       [live[i], live[j]] = [live[j], live[i]];
@@ -210,15 +210,15 @@ function drawPool(r: RangeBelief, dead: Set<Card>, size = 160): Card[][] {
   return out.length ? out : loose;
 }
 
-function equityDraw(hole: Card[], ranges: RangeBelief[], sims: number, heroDrawn: boolean): number {
+function equityDraw(hole: Card[], ranges: RangeBelief[], sims: number, drawsLeft: number): number {
   const dead = new Set<Card>(hole);
   const pools = ranges.map((r) => drawPool(r, dead));
-  const heroPlan = heroDrawn ? [] : chooseDiscards(hole).discard;
   const used = new Uint8Array(52);
   const fresh = () => {
     let c: number;
+    let guard = 0;
     do c = (rand() * 52) | 0;
-    while (used[c]);
+    while (used[c] && ++guard < 500); // the deck can't run dry: thrown cards go back in (see redraw)
     used[c] = 1;
     return c;
   };
@@ -268,8 +268,18 @@ function equityDraw(hole: Card[], ranges: RangeBelief[], sims: number, heroDrawn
       opp.push(best);
     }
     if (!ok) continue;
+    // Draws still to come: everyone draws the standard way
+    const redraw = (hand: Card[]) => {
+      for (let d = 0; d < drawsLeft; d++)
+        for (const idx of chooseDiscards(hand).discard) {
+          const thrown = hand[idx];
+          hand[idx] = fresh();
+          used[thrown] = 0; // discards are reshuffled into the deck, as at a real table
+        }
+    };
+    for (const o of opp) redraw(o);
     const me = hole.slice();
-    for (const idx of heroPlan) me[idx] = fresh();
+    redraw(me);
     const hero = evaluate(me);
     let ties = 1;
     let lost = false;

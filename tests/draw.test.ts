@@ -74,6 +74,39 @@ import { parseCards } from '../src/engine/cards';
 import { chooseDiscards, drawPct } from '../src/bots/draw';
 import { botAct, createSession, dealNext, DEFAULT_SETTINGS } from '../src/session';
 
+describe('multiple draws', () => {
+  it('three draws with a betting round after each', () => {
+    const h = startHand(seats(3), 0, 1, 2, 1, undefined, 'draw', 3);
+    const bets: string[] = [];
+    let guard = 0;
+    while (!h.done && guard++ < 100) {
+      if (h.street === 'draw') applyDraw(h, [0]);
+      else {
+        if (!bets.includes(h.street)) bets.push(h.street);
+        applyDecision(h, { type: legalActions(h).canCheck ? 'check' : 'call' });
+      }
+    }
+    expect(bets).toEqual(['preflop', 'flop', 'turn', 'river']);
+    expect(h.drawsDone).toBe(3);
+    const rounds = h.actions.filter((a) => a.type === 'draw').map((a) => a.round);
+    expect(rounds).toEqual([1, 1, 1, 2, 2, 2, 3, 3, 3]);
+    expect(h.showdown).toHaveLength(3);
+  });
+
+  it('bots play triple draw at a full table', () => {
+    const s = createSession({ ...DEFAULT_SETTINGS, variant: 'draw', draws: 3 }, 'x', false);
+    for (let i = 0; i < 150; i++) {
+      const hh = dealNext(s);
+      let guard = 0;
+      while (!hh.done && guard++ < 400) botAct(s);
+      expect(hh.done).toBe(true);
+      expect(hh.net.reduce((a, b) => a + b, 0)).toBe(0);
+      const all = hh.players.flatMap((p) => p.hole);
+      expect(new Set(all).size).toBe(all.length);
+    }
+  }, 60000);
+});
+
 describe('five-card draw strategy', () => {
   const plan = (h: string) => chooseDiscards(parseCards(h)).discard.length;
   it('draws like a solid player', () => {
