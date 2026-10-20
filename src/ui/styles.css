@@ -449,8 +449,11 @@ input:focus-visible {
   justify-self: center;
   background: rgb(0 0 0 / 0.16);
   box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.18);
-  border-radius: 18px;
-  padding: 10px;
+  /* Concentric corners: tray radius = card radius + the gap around the cards */
+  --tray-pad: 10px;
+  --card-r: 10px;
+  padding: var(--tray-pad);
+  border-radius: calc(var(--card-r) + var(--tray-pad));
   max-width: 100%;
 }
 .board {
@@ -1128,7 +1131,8 @@ input:focus-visible {
 /* When the stage gets short (raise sizer open, small phones), shrink what's on it */
 @container (max-height: 200px) {
   .tray {
-    padding: 6px;
+    --tray-pad: 6px;
+    --card-r: 8px;
   }
   .pot {
     font-size: 28px;
@@ -1156,7 +1160,8 @@ input:focus-visible {
 /* Showdown on a shorter screen: smaller board cards leave room for every hand */
 @container (max-height: 340px) {
   .is-done .tray {
-    padding: 6px;
+    --tray-pad: 6px;
+    --card-r: 8px;
   }
   .is-done .board .card-lg {
     width: 40px;
@@ -1301,8 +1306,7 @@ input:focus-visible {
   min-height: 14px;
 }
 .draw-hand {
-  gap: 6px;
-  padding-top: 12px; /* room for cards lifting when picked */
+  gap: 6px; /* picked cards lift out of the tray */
 }
 button.card {
   padding: 0;
@@ -1623,6 +1627,9 @@ button.card {
 }
 /* Very small phones at showdown: compact board so the result fits */
 @container (max-height: 250px) {
+  .is-done .tray {
+    --card-r: 6px;
+  }
   .is-done .board .card-lg {
     width: 32px;
     height: 44px;
@@ -1653,4 +1660,9 @@ button.card {
   flex-wrap: wrap;
   gap: 6px;
   color: var(--muted);
+}
+
+/* Cards in the tray always use the tray's card radius, so the corners stay concentric */
+.tray .card {
+  border-radius: var(--card-r);
 }
