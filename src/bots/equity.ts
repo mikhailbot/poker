@@ -3,6 +3,7 @@ import { evaluate } from '../engine/evaluator';
 import { evaluateOmaha, type Variant } from '../engine/omaha';
 import { ploPct } from './plo';
 import { PREFLOP } from './preflopTable';
+import { chooseDiscards, drawPct } from './draw';
 
 /** All 1326 two-card combos with their preflop percentile (0 = best). */
 interface Combo {
@@ -13,7 +14,8 @@ const COMBOS: Combo[] = [];
 for (let a = 0; a < 52; a++)
   for (let b = a + 1; b < 52; b++) COMBOS.push({ cards: [a, b], pct: PREFLOP[handKey(a, b)][0] });
 
-export const preflopPct = (hole: Card[]) => (hole.length === 4 ? ploPct(hole) : PREFLOP[handKey(hole[0], hole[1])][0]);
+export const preflopPct = (hole: Card[]) =>
+  hole.length === 5 ? drawPct(hole) : hole.length === 4 ? ploPct(hole) : PREFLOP[handKey(hole[0], hole[1])][0];
 
 /**
  * What we believe about one opponent's holding.
@@ -26,6 +28,8 @@ export interface RangeBelief {
   hi: number;
   narrow: number;
   bluffy: number;
+  /** Five-card draw: how many cards they drew (undefined if they haven't drawn yet). */
+  drew?: number;
 }
 
 const rand = Math.random;
@@ -78,8 +82,11 @@ export function equityVsRanges(
   ranges: RangeBelief[],
   sims = 700,
   variant: Variant = 'holdem',
+  /** Five-card draw only: has the hero already drawn? */
+  heroDrawn = false,
 ): number {
   if (ranges.length === 0) return 1;
+  if (variant === 'draw') return equityDraw(hole, ranges, sims, heroDrawn);
   const plo = variant === 'plo';
   const score = plo ? evaluateOmaha : (h: Card[], b: Card[]) => evaluate([...h, ...b]);
   const dead = new Set<Card>([...hole, ...board]);
@@ -149,6 +156,125 @@ export function equityVsRanges(
     let lost = false;
     for (const o of opp) {
       const v = score(o, full);
+      if (v > hero) {
+        lost = true;
+        break;
+      }
+      if (v === hero) ties++;
+    }
+    valid++;
+    if (!lost) total += 1 / ties;
+  }
+  return valid ? total / valid : 0.5;
+}
+
+// ---------------------------------------------------------------- five-card draw
+
+/**
+ * Hands an opponent could have started with: inside their preflop range and,
+ * if they've drawn, consistent with how many cards they took (a pat hand may
+ * be a bluff). Sampled once per decision for speed.
+ */
+function drawPool(r: RangeBelief, dead: Set<Card>, size = 160): Card[][] {
+  const lo = Math.max(0, r.lo);
+  const hi = Math.min(1, Math.max(r.hi, lo + 0.03));
+  const live = Array.from({ length: 52 }, (_, i) => i).filter((c) => !dead.has(c));
+  const pool: Card[][] = [];
+  const bluffs: Card[][] = []; // stood pat with nothing ("snowing")
+  const loose: Card[][] = [];
+  for (let tries = 0; tries < 12000 && pool.length < size; tries++) {
+    for (let i = 0; i < 5; i++) {
+      const j = i + ((rand() * (live.length - i)) | 0);
+      [live[i], live[j]] = [live[j], live[i]];
+    }
+    const h = live.slice(0, 5);
+    if (r.drew === undefined) {
+      const p = drawPct(h);
+      if (p >= lo && p <= hi) pool.push(h);
+      continue;
+    }
+    const n = chooseDiscards(h).discard.length;
+    if (n === r.drew) {
+      const p = drawPct(h);
+      // Their range before the draw still applies, loosely: what they draw says more
+      if (p >= lo - 0.05 && p <= hi + 0.1) pool.push(h);
+      else if (loose.length < size) loose.push(h);
+    } else if (r.drew === 0 && n >= 4 && bluffs.length < 60) bluffs.push(h);
+  }
+  let out = pool.length >= 15 ? pool : pool.concat(loose).slice(0, size);
+  if (r.drew === 0 && out.length) {
+    // Mix in bluffs at the rate this player bluffs
+    const want = Math.round((out.length * r.bluffy) / Math.max(0.05, 1 - r.bluffy));
+    out = out.concat(bluffs.slice(0, want));
+  }
+  return out.length ? out : loose;
+}
+
+function equityDraw(hole: Card[], ranges: RangeBelief[], sims: number, heroDrawn: boolean): number {
+  const dead = new Set<Card>(hole);
+  const pools = ranges.map((r) => drawPool(r, dead));
+  const heroPlan = heroDrawn ? [] : chooseDiscards(hole).discard;
+  const used = new Uint8Array(52);
+  const fresh = () => {
+    let c: number;
+    do c = (rand() * 52) | 0;
+    while (used[c]);
+    used[c] = 1;
+    return c;
+  };
+  let total = 0;
+  let valid = 0;
+  for (let s = 0; s < sims; s++) {
+    used.fill(0);
+    for (const c of hole) used[c] = 1;
+    const opp: Card[][] = [];
+    let ok = true;
+    for (let i = 0; i < ranges.length; i++) {
+      const r = ranges[i];
+      const k = rand() < r.bluffy ? 1 : Math.max(1, Math.round(r.narrow + (rand() - 0.5)));
+      let best: Card[] | null = null;
+      let bestScore = -1;
+      for (let t = 0, tries = 0; t < k && tries < 40; tries++) {
+        const start = pools[i][(rand() * pools[i].length) | 0];
+        if (start.some((c) => used[c])) continue;
+        t++;
+        // Replace the cards this hand would throw away (a pat hand, even a bluff, keeps all five)
+        const plan = r.drew === 0 ? [] : chooseDiscards(start).discard;
+        const hand = start.slice();
+        for (const c of hand) used[c] = 1;
+        const drawn: Card[] = [];
+        for (const idx of plan) {
+          const c = fresh();
+          drawn.push(c);
+          hand[idx] = c;
+        }
+        // release so other candidates can be tried; the kept one is re-marked below
+        for (const c of start) used[c] = 0;
+        for (const c of drawn) used[c] = 0;
+        for (const c of hole) used[c] = 1;
+        for (const o of opp) for (const c of o) used[c] = 1;
+        const sc = evaluate(hand);
+        if (sc > bestScore) {
+          bestScore = sc;
+          best = hand;
+        }
+        if (k === 1) break;
+      }
+      if (!best) {
+        ok = false;
+        break;
+      }
+      for (const c of best) used[c] = 1;
+      opp.push(best);
+    }
+    if (!ok) continue;
+    const me = hole.slice();
+    for (const idx of heroPlan) me[idx] = fresh();
+    const hero = evaluate(me);
+    let ties = 1;
+    let lost = false;
+    for (const o of opp) {
+      const v = evaluate(o);
       if (v > hero) {
         lost = true;
         break;

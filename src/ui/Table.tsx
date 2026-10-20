@@ -4,11 +4,21 @@ import { handKey } from '../engine/cards';
 import { describeScore } from '../engine/evaluator';
 import { scoreHand } from '../engine/omaha';
 import { describePlo, ploPct } from '../bots/plo';
+import { drawPct } from '../bots/draw';
 import { type HandState, describeAction, positionOf, potTotal } from '../engine/game';
 import type { Session } from '../session';
 import { CardView } from './CardView';
 
 const STREET: Record<string, string> = { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' };
+const DRAW_STREET: Record<string, string> = { preflop: 'Before the draw', draw: 'Drawing', river: 'After the draw' };
+const streetName = (h: HandState) => (h.variant === 'draw' ? DRAW_STREET : STREET)[h.street] ?? '';
+
+/** Five-card draw: how many cards a player took, in words. */
+function drawWords(h: HandState, seat: number): string | null {
+  const a = h.actions.find((x) => x.seat === seat && x.type === 'draw');
+  if (!a) return null;
+  return a.amount === 0 ? 'Stood pat' : `Drew ${a.amount}`;
+}
 const VERB: Record<string, string> = { fold: 'Folded', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', post: '' };
 
 /** What a seat did most recently on the current street. */
@@ -31,15 +41,18 @@ interface Props {
   revealMucked: boolean;
   /** Current bot think time in ms (drives the timer ring), 0 when idle. */
   thinking: number;
+  /** Five-card draw: positions in your hand marked to swap, and how to toggle one. */
+  selected?: Set<number>;
+  onToggle?: (index: number) => void;
 }
 
-export function Table({ session, revealStyles, revealMucked, thinking }: Props) {
+export function Table({ session, revealStyles, revealMucked, thinking, selected, onToggle }: Props) {
   const h = session.hand;
   if (!h) return null;
   return (
-    <div className={`table ${h.variant === 'plo' ? 'is-plo' : ''}`}>
+    <div className={`table is-${h.variant}`}>
       <Opponents h={h} session={session} revealStyles={revealStyles} revealMucked={revealMucked} thinking={thinking} />
-      <Stage h={h} revealMucked={revealMucked} />
+      <Stage h={h} revealMucked={revealMucked} selected={selected} onToggle={onToggle} />
       <Hero h={h} />
     </div>
   );
@@ -74,6 +87,7 @@ function Opponents({ h, session, revealStyles, revealMucked, thinking }: { h: Ha
             <div className="opp-name">{seat.name}</div>
             <div className="opp-stack">{p.stack === 0 && p.allIn ? 'All-in' : p.stack}</div>
             <div className="opp-pos">{positionOf(h, i)}</div>
+            {h.variant === 'draw' && <div className="opp-drew">{!p.folded ? drawWords(h, i) ?? '' : ''}</div>}
             <div className="opp-status">
               {reveal || mucked ? (
                 <span className={`mini-cards ${mucked ? 'mucked' : ''}`} title={mucked ? 'Folded hand' : undefined}>
@@ -107,27 +121,63 @@ function Opponents({ h, session, revealStyles, revealMucked, thinking }: { h: Ha
 
 // ------------------------------------------------------------ stage
 
-function Stage({ h, revealMucked }: { h: HandState; revealMucked: boolean }) {
+function Stage({
+  h,
+  revealMucked,
+  selected,
+  onToggle,
+}: {
+  h: HandState;
+  revealMucked: boolean;
+  selected?: Set<number>;
+  onToggle?: (index: number) => void;
+}) {
   const last = [...h.actions].reverse().find((a) => a.type !== 'post');
   const pot = h.done ? h.pots.reduce((s, p) => s + p.amount, 0) : potTotal(h);
   return (
     <section className="stage" aria-label="Board">
       <div className="stage-head">
-        <span className="street">{h.done ? (h.showdown.length ? 'Showdown' : 'Hand over') : STREET[h.street]}</span>
+        <span className="street">{h.done ? (h.showdown.length ? 'Showdown' : 'Hand over') : streetName(h)}</span>
         <span className="pot">
           <small>Pot</small>
           {pot}
         </span>
       </div>
-      <div className="board">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <CardView key={`${i}-${h.board[i] ?? 'x'}`} card={h.board[i]} size="lg" delay={i < 3 ? i * 70 : 0} />
-        ))}
-      </div>
+      {h.variant === 'draw' ? (
+        <DrawHand h={h} selected={selected} onToggle={onToggle} />
+      ) : (
+        <div className="board">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <CardView key={`${i}-${h.board[i] ?? 'x'}`} card={h.board[i]} size="lg" delay={i < 3 ? i * 70 : 0} />
+          ))}
+        </div>
+      )}
       <div className="ticker" aria-live="polite">
         {h.done ? <Result h={h} revealMucked={revealMucked} /> : last ? describeAction(h, last) : `Blinds ${h.smallBlind}/${h.bigBlind}`}
       </div>
     </section>
+  );
+}
+
+/** Five-card draw: there's no board, so your hand takes centre stage (and is where you pick discards). */
+function DrawHand({ h, selected, onToggle }: { h: HandState; selected?: Set<number>; onToggle?: (index: number) => void }) {
+  const me = h.players[0];
+  const picking = !h.done && h.street === 'draw' && h.toAct === 0 && !!onToggle;
+  // Show high cards first, but keep each card's real position for discarding
+  const order = me.hole.map((c, i) => ({ c, i })).sort((a, b) => b.c - a.c);
+  return (
+    <div className={`board draw-hand ${picking ? 'picking' : ''}`} aria-label="Your hand">
+      {order.map(({ c, i }) => (
+        <CardView
+          key={`${h.handId}-${i}-${c}`}
+          card={c}
+          size="lg"
+          dim={me.folded}
+          selected={picking && selected?.has(i)}
+          onClick={picking ? () => onToggle!(i) : undefined}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -206,6 +256,10 @@ function handRead(h: HandState, holeIn: number[]): string {
       ? describeScore(scoreHand('plo', hole, h.board))
       : `${describePlo(hole)}, ${rankPhrase(ploPct(hole))}`;
   }
+  if (hole.length === 5) {
+    const made = describeScore(scoreHand('draw', hole, []));
+    return h.street === 'preflop' && !h.done ? `${made}, ${rankPhrase(drawPct(hole))} of hands` : made;
+  }
   if (hole.length !== 2) return '';
   if (h.board.length >= 3) return describeScore(scoreHand('holdem', hole, h.board));
   const key = handKey(hole[0], hole[1]);
@@ -224,7 +278,7 @@ function Hero({ h }: { h: HandState }) {
   return (
     <section className={`hero ${active ? 'active' : ''} ${me.folded ? 'folded' : ''}`} aria-label="Your hand">
       <div className="hero-cards">
-        {hole.map((c, k) => (
+        {h.variant !== 'draw' && hole.map((c, k) => (
           <CardView key={`${h.handId}-${k}`} card={c} size="lg" dim={me.folded} />
         ))}
       </div>
@@ -240,6 +294,7 @@ function Hero({ h }: { h: HandState }) {
               In <b>{me.bet}</b>
             </span>
           )}
+          {h.variant === 'draw' && drawWords(h, 0) && <span className="hero-drew">{drawWords(h, 0) === 'Stood pat' ? 'You stood pat' : `You drew ${drawWords(h, 0)!.slice(5)}`}</span>}
           {h.button === 0 && <span className="dealer inline">D</span>}
         </div>
       </div>

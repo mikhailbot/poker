@@ -1,7 +1,7 @@
-import { decide, type BotChoice } from './bots/brain';
+import { decide, decideDraw, type BotChoice } from './bots/brain';
 import { BOT_NAMES, PROFILE_IDS } from './bots/profiles';
 import { emptyStats, recordHand, type PlayerStats } from './bots/stats';
-import { type Decision, type HandState, applyDecision, nextSeat, startHand } from './engine/game';
+import { type Decision, type HandState, applyDecision, applyDraw, nextSeat, startHand } from './engine/game';
 import type { Variant } from './engine/omaha';
 
 export interface SeatInfo {
@@ -134,6 +134,13 @@ export function act(s: Session, d: Decision) {
   if (h.done) finishHand(s);
 }
 
+/** Five-card draw: the player to act throws away these positions and draws replacements. */
+export function drawCards(s: Session, discard: number[]) {
+  const h = s.hand!;
+  applyDraw(h, discard);
+  if (h.done) finishHand(s);
+}
+
 /** Play the rest of the hand instantly (used once you've folded). */
 export function runOut(s: Session) {
   let guard = 0;
@@ -143,6 +150,12 @@ export function runOut(s: Session) {
 export function botAct(s: Session): BotChoice {
   const h = s.hand!;
   const seat = h.toAct;
+  if (h.street === 'draw') {
+    const d = decideDraw(h, seat, { stats: s.stats, tilt: s.seats[seat].tilt });
+    s.notes[h.actions.length] = d.note;
+    drawCards(s, d.discard);
+    return { decision: { type: 'check' }, note: d.note };
+  }
   const choice = decide(h, seat, { stats: s.stats, tilt: s.seats[seat].tilt });
   s.notes[h.actions.length] = choice.note + (choice.equity !== undefined ? ` (equity ${Math.round(choice.equity * 100)}%)` : '');
   act(s, choice.decision);

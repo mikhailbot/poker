@@ -8,6 +8,7 @@ import {
   createSession,
   dealNext,
   DEFAULT_SETTINGS,
+  drawCards,
   rebuyHuman,
   runOut,
   TABLES,
@@ -22,9 +23,12 @@ import {
   type Prefs,
   savePrefs,
   saveSession,
+  sessionSummary,
   toHistory,
 } from '../store/persist';
 import { ActionBar } from './ActionBar';
+import { DrawBar } from './DrawBar';
+import { GAMES, GamePicker } from './GamePicker';
 import { HistorySheet, SettingsSheet, StatsSheet } from './Sheets';
 import { Table } from './Table';
 
@@ -39,9 +43,11 @@ const FOLDED_DELAY: [number, number] = [70, 140];
 const PAUSE_SHOWDOWN = 8000; // cards were shown: time to study them
 const PAUSE_NO_SHOWDOWN = 4500;
 
-export const GAME_NAME: Record<Variant, string> = { holdem: "Hold'em", plo: 'Omaha' };
+type Panel = null | 'history' | 'stats' | 'settings' | 'games';
 
-type Panel = null | 'history' | 'stats' | 'settings';
+/** A fresh session for a game, at the given table. */
+const freshSession = (game: Variant, table: TableKind) =>
+  createSession({ ...DEFAULT_SETTINGS, variant: game, table, lineup: table === 'random' ? 'random' : TABLES[table] });
 
 export function App() {
   const sessionRef = useRef<Session>(loadSession() ?? createSession());
@@ -53,6 +59,8 @@ export function App() {
   /** Countdown (ms) until the next auto-deal, or 0 when none is running. */
   const [autoIn, setAutoIn] = useState(0);
   const [held, setHeld] = useState(false);
+  /** Five-card draw: positions marked to swap. */
+  const [picked, setPicked] = useState<Set<number>>(new Set());
   const s = sessionRef.current;
   const h = s.hand;
   const hero = s.seats.find((x) => x.isHuman)!;
@@ -71,6 +79,7 @@ export function App() {
     if (!canDeal(sess)) return;
     dealNext(sess);
     setHeld(false);
+    setPicked(new Set());
     setAutoIn(0);
     if (sess.hand!.done) onHandDone();
     rerender();
@@ -126,17 +135,40 @@ export function App() {
     savePrefs(p);
   };
 
-  const newSession = (table: TableKind = s.settings.table ?? 'lively', game: Variant = variant) => {
-    sessionRef.current = createSession({
-      ...DEFAULT_SETTINGS,
-      variant: game,
-      table,
-      lineup: table === 'random' ? 'random' : TABLES[table],
-    });
+  /** Switch to another game, resuming its saved session if there is one. */
+  const switchGame = (game: Variant) => {
+    saveSession(sessionRef.current); // keeps this game's stacks (the hand in progress is abandoned)
+    sessionRef.current = loadSession(game) ?? freshSession(game, s.settings.table ?? 'lively');
+    sessionRef.current.hand = null;
     saveSession(sessionRef.current);
     setPanel(null);
+    setPicked(new Set());
     deal();
   };
+
+  /** Start the current game again at a new table. */
+  const newTable = (table: TableKind) => {
+    sessionRef.current = freshSession(variant, table);
+    saveSession(sessionRef.current);
+    setPanel(null);
+    setPicked(new Set());
+    deal();
+  };
+
+  const onDraw = (discard: number[]) => {
+    drawCards(sessionRef.current, discard);
+    setPicked(new Set());
+    if (sessionRef.current.hand!.done) onHandDone();
+    rerender();
+  };
+
+  const togglePick = (i: number) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
 
   const heroTurn = h && !h.done && h.players[h.toAct].isHuman;
   const net = hero.stack - hero.buyIns;
@@ -145,8 +177,8 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="game-chip" onClick={() => setPanel('settings')} aria-label="Game and settings">
-          <span className="game-name">{GAME_NAME[variant]}</span>
+        <button className="game-chip" onClick={() => setPanel('games')} aria-label="Choose a game">
+          <span className="game-name">{GAMES.find((g) => g.id === variant)!.short}</span>
           <span className="game-stakes">
             {s.settings.smallBlind}/{s.settings.bigBlind}
           </span>
@@ -162,19 +194,40 @@ export function App() {
           </span>
           <span className="session-hands">Hand {s.handCount}</span>
         </button>
-        <button className="icon-btn" onClick={() => setPanel('history')} aria-label="Hand history">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-            <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4h4M12 7.5V12l3 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+        <div className="top-icons">
+          <button className="icon-btn" onClick={() => setPanel('history')} aria-label="Hand history">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+              <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4h4M12 7.5V12l3 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button className="icon-btn" onClick={() => setPanel('settings')} aria-label="Settings">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+              <path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" strokeWidth="2" />
+              <circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" strokeWidth="2" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       <main className="main">
-        <Table session={s} revealStyles={prefs.revealStyles} revealMucked={prefs.revealMucked} thinking={thinking} />
+        <Table
+          session={s}
+          revealStyles={prefs.revealStyles}
+          revealMucked={prefs.revealMucked}
+          thinking={thinking}
+          selected={picked}
+          onToggle={togglePick}
+        />
       </main>
 
       <footer className="dock">
-        {heroTurn && h && <ActionBar hand={h} stats={s.stats} showOdds={prefs.showOdds} showChance={prefs.showChance} onAct={onAct} />}
+        {heroTurn && h && h.street === 'draw' && (
+          <DrawBar hand={h} selected={picked} onSelect={setPicked} onDraw={onDraw} showHint={prefs.showChance} />
+        )}
+        {heroTurn && h && h.street !== 'draw' && (
+          <ActionBar hand={h} stats={s.stats} showOdds={prefs.showOdds} showChance={prefs.showChance} onAct={onAct} />
+        )}
 
         {h && !h.done && !heroTurn && heroFolded && (
           <div className="dock-row">
@@ -236,13 +289,14 @@ export function App() {
 
       {panel === 'history' && <HistorySheet history={history} onClose={() => setPanel(null)} />}
       {panel === 'stats' && <StatsSheet session={s} onClose={() => setPanel(null)} />}
-      {panel === 'settings' && (
-        <SettingsSheet
-          prefs={prefs}
-          variant={variant}
+      {panel === 'settings' && <SettingsSheet prefs={prefs} onPrefs={updatePrefs} onClose={() => setPanel(null)} />}
+      {panel === 'games' && (
+        <GamePicker
+          current={variant}
           table={s.settings.table ?? 'mixed'}
-          onPrefs={updatePrefs}
-          onNewSession={newSession}
+          summaries={{ holdem: sessionSummary('holdem'), plo: sessionSummary('plo'), draw: sessionSummary('draw') }}
+          onPickGame={switchGame}
+          onNewTable={newTable}
           onClose={() => setPanel(null)}
         />
       )}

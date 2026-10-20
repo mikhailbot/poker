@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { PROFILES } from '../bots/profiles';
 import { pct, type PlayerStats } from '../bots/stats';
 import type { HistoryEntry, Prefs } from '../store/persist';
-import type { Session, TableKind } from '../session';
+import type { Session } from '../session';
 import { CardView } from './CardView';
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -59,11 +59,16 @@ export function HistorySheet({ history, onClose }: { history: HistoryEntry[]; on
 }
 
 const STREET_LABEL: Record<string, string> = { preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River' };
+const DRAW_LABEL: Record<string, string> = { preflop: 'Before the draw', draw: 'The draw', river: 'After the draw' };
 const boardFor = (street: string, board: number[]) =>
   street === 'flop' ? board.slice(0, 3) : street === 'turn' ? board.slice(3, 4) : street === 'river' ? board.slice(4, 5) : [];
 
 function HandDetail({ entry: e, onBack, onClose }: { entry: HistoryEntry; onBack: () => void; onClose: () => void }) {
-  const streets = ['preflop', 'flop', 'turn', 'river'].filter((s) => e.lines.some((l) => l.street === s));
+  const isDraw = e.variant === 'draw';
+  const labels = isDraw ? DRAW_LABEL : STREET_LABEL;
+  const streets = (isDraw ? ['preflop', 'draw', 'river'] : ['preflop', 'flop', 'turn', 'river']).filter((s) =>
+    e.lines.some((l) => l.street === s),
+  );
   const name = (seat: number) => e.players.find((p) => p.seat === seat)?.name ?? '';
   return (
     <Sheet title={`Hand #${e.id}`} onClose={onClose}>
@@ -93,7 +98,7 @@ function HandDetail({ entry: e, onBack, onClose }: { entry: HistoryEntry; onBack
       {streets.map((s) => (
         <section key={s} className="hd-street">
           <h3>
-            {STREET_LABEL[s]}
+            {labels[s]}
             <span className="hd-board">
               {boardFor(s, e.board).map((c, i) => (
                 <CardView key={i} card={c} size="sm" />
@@ -197,21 +202,11 @@ export function StatsSheet({ session, onClose }: { session: Session; onClose: ()
 
 interface SettingsProps {
   prefs: Prefs;
-  variant: 'holdem' | 'plo';
-  table: TableKind;
   onPrefs: (p: Prefs) => void;
-  onNewSession: (table?: TableKind, game?: 'holdem' | 'plo') => void;
   onClose: () => void;
 }
 
-const TABLE_INFO: { id: TableKind; label: string; hint: string }[] = [
-  { id: 'lively', label: 'Lively', hint: 'Casual players, a calling station and a maniac: lots of flops and action.' },
-  { id: 'mixed', label: 'Mixed', hint: 'One of each style, including a tight nit.' },
-  { id: 'tough', label: 'Tough', hint: 'Mostly solid and aggressive regulars. Fewer mistakes to exploit.' },
-  { id: 'random', label: 'Random', hint: 'Five styles picked at random.' },
-];
-
-export function SettingsSheet({ prefs, variant, table, onPrefs, onNewSession, onClose }: SettingsProps) {
+export function SettingsSheet({ prefs, onPrefs, onClose }: SettingsProps) {
   const toggle = (k: 'showOdds' | 'showChance' | 'revealStyles' | 'revealMucked' | 'autoDeal', label: string, hint: string) => (
     <label className="toggle">
       <span>
@@ -224,21 +219,6 @@ export function SettingsSheet({ prefs, variant, table, onPrefs, onNewSession, on
   return (
     <Sheet title="Settings" onClose={onClose}>
       <div className="field">
-        <span>Game</span>
-        <div className="seg">
-          <button className={variant === 'holdem' ? 'on' : ''} onClick={() => variant !== 'holdem' && onNewSession(undefined, 'holdem')}>
-            No-limit Hold'em
-          </button>
-          <button className={variant === 'plo' ? 'on' : ''} onClick={() => variant !== 'plo' && onNewSession(undefined, 'plo')}>
-            Pot-limit Omaha
-          </button>
-        </div>
-        <p className="fine">
-          Omaha deals four cards each. Your hand must use exactly two of them with three from the board. Switching starts a
-          new session.
-        </p>
-      </div>
-      <div className="field">
         <span>Bot speed</span>
         <div className="seg">
           {(['relaxed', 'normal', 'fast'] as const).map((s) => (
@@ -249,24 +229,10 @@ export function SettingsSheet({ prefs, variant, table, onPrefs, onNewSession, on
         </div>
       </div>
       {toggle('showOdds', 'Show what you need to call', 'How often you must win for a call to pay off, based on the price.')}
-      {toggle('showChance', 'Show my chance of winning', 'An estimate against the hands your opponents are likely to hold.')}
+      {toggle('showChance', 'Show my chance of winning and hints', 'An estimate against the hands your opponents likely hold, plus the usual way to draw in five-card draw.')}
       {toggle('revealMucked', 'Show all cards after the hand', 'Reveal the hands of players who folded, so you can see what they had.')}
       {toggle('revealStyles', 'Reveal player styles', 'Label each bot with how it plays. Off is more realistic.')}
       {toggle('autoDeal', 'Deal next hand automatically after you fold', 'Waits a few seconds (longer when cards are shown). Hands you play to the end always wait for you.')}
-      <div className="field">
-        <span>Table</span>
-        <div className="seg">
-          {TABLE_INFO.map((t) => (
-            <button key={t.id} className={table === t.id ? 'on' : ''} onClick={() => onNewSession(t.id)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <p className="fine">
-          {TABLE_INFO.find((t) => t.id === table)?.hint} Picking a table, even the current one, starts a new session with
-          fresh stacks and stats. Hand history is kept.
-        </p>
-      </div>
     </Sheet>
   );
 }

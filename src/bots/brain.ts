@@ -10,6 +10,7 @@ import { type Card, rankOf, suitOf } from '../engine/cards';
 import { equityVsRanges, preflopPct, type RangeBelief } from './equity';
 import { PROFILES, type Profile } from './profiles';
 import { estimate, type PlayerStats } from './stats';
+import { chooseDiscards } from './draw';
 
 export interface BotContext {
   stats: PlayerStats[];
@@ -168,6 +169,7 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
 }
 
 function isBluffable3bet(hole: Card[]) {
+  if (hole.length === 5) return false; // five-card draw: bluff raises come after the draw
   if (hole.length > 2) {
     // Omaha: suited ace (nut-flush blocker) or a connected rundown
     const ace = hole.find((c) => rankOf(c) === 12);
@@ -243,7 +245,9 @@ export function beliefFor(h: HandState, v: number, stats: PlayerStats[]): RangeB
   const pot = potTotal(h) - pv.bet;
   if (pv.bet > 0 && pv.bet > 0.8 * pot) narrow += 0.6;
   const bluffy = clamp(0.12 + 0.12 * (s.af - 1.5) + 0.5 * Math.max(0, s.pfr - 0.2), 0.05, 0.55);
-  return { lo, hi, narrow, bluffy };
+  // Five-card draw: how many cards they took tells a lot about their hand
+  const drawAct = h.actions.find((a) => a.seat === v && a.type === 'draw');
+  return { lo, hi, narrow, bluffy, drew: drawAct ? drawAct.amount : undefined };
 }
 
 // ---------------------------------------------------------------- postflop
@@ -255,7 +259,8 @@ function postflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotC
   const nOpp = opps.length;
   const beliefs = opps.map((o) => beliefFor(h, o.seat, ctx.stats));
   const sims = h.variant === 'plo' ? (nOpp > 2 ? 180 : 300) : nOpp > 2 ? 500 : 800;
-  const E = equityVsRanges(me.hole, h.board, beliefs, sims, h.variant);
+  const heroDrawn = h.actions.some((a) => a.seat === seat && a.type === 'draw');
+  const E = equityVsRanges(me.hole, h.board, beliefs, h.variant === 'draw' ? 400 : sims, h.variant, heroDrawn);
   const pot = potTotal(h);
   const street = h.street;
   const draw = drawStrength(me.hole, h.board);
@@ -336,7 +341,7 @@ function lastStreetBetBy(h: HandState, seat: number, street: string) {
 
 /** 0..1 rough strength of draws (flush/straight) — used for semi-bluffing and realisation. */
 export function drawStrength(hole: Card[], board: Card[]): number {
-  if (board.length >= 5) return 0;
+  if (board.length >= 5 || hole.length === 5) return 0;
   if (hole.length > 2) {
     // Omaha: draws must use exactly two hole cards, so take the best pair
     let best = 0;
@@ -373,4 +378,18 @@ export function boardWetness(board: Card[]): number {
   let connected = 0;
   for (let i = 1; i < ranks.length; i++) if (ranks[i] - ranks[i - 1] <= 2 && ranks[i] !== ranks[i - 1]) connected++;
   return clamp(0.15 + (maxSuit >= 3 ? 0.4 : maxSuit === 2 ? 0.2 : 0) + connected * 0.15, 0, 1);
+}
+
+// ---------------------------------------------------------------- five-card draw
+
+/** Which cards to throw away in five-card draw, with a little personality. */
+export function decideDraw(h: HandState, seat: number, ctx: BotContext): { discard: number[]; note: string } {
+  const me = h.players[seat];
+  const p = tilted(PROFILES[me.profileId] ?? PROFILES.tag, ctx.tilt);
+  const opps = h.players.filter((o) => o.seat !== seat && !o.folded && !o.sittingOut).length;
+  // Standing pat with nothing ("snowing") is a bluff that works best against one opponent
+  const snow = opps <= 2 && r() < p.bluff * (opps === 1 ? 0.45 : 0.2) && h.preflopAggressor === seat;
+  const keepKicker = r() < 0.15 + p.aggression * 0.2;
+  const plan = chooseDiscards(me.hole, { snow, keepKicker });
+  return { discard: plan.discard, note: plan.why.toLowerCase() };
 }

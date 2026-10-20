@@ -1232,3 +1232,233 @@ input:focus-visible {
     height: min(var(--app-h, 100dvh), 860px);
   }
 }
+
+/* ------------------------------------------------------------ top bar icons */
+.top-icons {
+  justify-self: end;
+  display: flex;
+  gap: 8px;
+}
+.top-icons .icon-btn {
+  justify-self: auto;
+}
+
+/* ------------------------------------------------------------ five-card draw */
+.is-draw .hero-cards {
+  display: none;
+}
+.is-draw .mini-cards .card-xs {
+  width: 12.5px;
+}
+.opp-drew {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  min-height: 14px;
+}
+.draw-hand {
+  gap: 6px;
+  padding-top: 12px; /* room for cards lifting when picked */
+}
+button.card {
+  padding: 0;
+  font: inherit;
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+.card.pickable {
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms;
+  animation: none;
+}
+.card.pickable:active {
+  transform: scale(0.97);
+}
+.card.selected {
+  transform: translateY(-12px);
+  box-shadow:
+    0 0 0 3px var(--stage),
+    0 0 0 5px #fff;
+  opacity: 0.88;
+}
+.swap-tag {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  color: var(--stage);
+  font: 700 10px/16px var(--font-ui);
+  padding: 0 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.drawbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.draw-hint {
+  margin: 0;
+  padding-inline: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.draw-tip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 8px 8px 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.draw-tip b {
+  color: var(--ink);
+  font-weight: 650;
+}
+.tip-btn {
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  font-weight: 650;
+  font-size: 13px;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------ game picker */
+.games {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.game {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 14px 10px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--surface);
+  text-align: left;
+}
+.game.current {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.fan {
+  position: relative;
+  height: 44px;
+  display: flex;
+  justify-content: center;
+}
+.fan i {
+  position: absolute;
+  bottom: 0;
+  width: 22px;
+  height: 32px;
+  margin-left: -11px;
+  left: 50%;
+  border-radius: 4px;
+  border: 1.5px solid var(--surface);
+  background: repeating-linear-gradient(135deg, var(--accent) 0 3px, color-mix(in srgb, var(--accent) 72%, white) 3px 4.5px);
+  transform-origin: 50% 120%;
+}
+.game-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.game-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+}
+.game-about {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.game-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--accent);
+}
+.game-state small {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+}
+.badge {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+.picker-h {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 22px 0 8px;
+}
+.tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.table-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+}
+.table-opt.on {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.table-name {
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.table-name small {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--muted);
+}
+.table-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.picker-go {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.hero-drew {
+  color: var(--accent);
+  font-weight: 650;
+}

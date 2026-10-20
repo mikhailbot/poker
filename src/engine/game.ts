@@ -2,8 +2,12 @@ import { type Card, cardToString, shuffledDeck } from './cards';
 import { describeScore } from './evaluator';
 import { HOLE_CARDS, scoreHand, type Variant } from './omaha';
 
-export type Street = 'preflop' | 'flop' | 'turn' | 'river';
-export type ActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'post';
+/**
+ * Betting rounds. Five-card draw uses 'preflop' (before the draw), 'draw' (the
+ * drawing round, no betting) and 'river' (after the draw).
+ */
+export type Street = 'preflop' | 'flop' | 'turn' | 'river' | 'draw';
+export type ActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'post' | 'draw';
 
 export interface Action {
   seat: number;
@@ -75,6 +79,8 @@ export interface HandState {
   /** Net chip change per seat for this hand, filled when done. */
   net: number[];
   startStacks: number[];
+  /** Five-card draw: discarded cards, reshuffled if the deck runs out. */
+  muck: Card[];
 }
 
 export interface SeatConfig {
@@ -160,6 +166,7 @@ export function startHand(
     showdown: [],
     net: players.map(() => 0),
     startStacks: players.map((p) => p.stack),
+    muck: [],
   };
 
   const active = players.filter((p) => !p.sittingOut);
@@ -305,6 +312,7 @@ function isRoundComplete(h: HandState): boolean {
 }
 
 function advance(h: HandState) {
+  if (h.variant === 'draw') return advanceDraw(h);
   // Move to the next street, or run out the board if betting is closed.
   while (true) {
     if (h.street === 'river') {
@@ -332,6 +340,66 @@ function advance(h: HandState) {
   }
 }
 
+const resetBetting = (h: HandState) => {
+  for (const p of h.players) {
+    p.bet = 0;
+    p.hasActed = false;
+  }
+  h.currentBet = 0;
+  h.lastRaiseSize = h.bigBlind;
+  h.lastAggressor = -1;
+};
+
+/** Five-card draw: betting -> drawing round -> betting -> showdown. */
+function advanceDraw(h: HandState) {
+  if (h.street === 'preflop') {
+    h.street = 'draw';
+    resetBetting(h);
+    // Everyone still in draws, including all-in players, starting left of the button
+    h.toAct = nextSeat(h, h.button, inHand);
+    return;
+  }
+  if (h.street === 'draw') {
+    h.street = 'river';
+    resetBetting(h);
+    if (h.players.filter(canAct).length >= 2) {
+      h.toAct = nextSeat(h, h.button, canAct);
+      return;
+    }
+  }
+  finish(h);
+}
+
+function drawCard(h: HandState): Card {
+  if (h.deck.length === 0) {
+    // Out of cards: shuffle the discards back in, as dealers do
+    h.deck = h.muck.splice(0);
+    for (let i = h.deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [h.deck[i], h.deck[j]] = [h.deck[j], h.deck[i]];
+    }
+  }
+  return h.deck.pop()!;
+}
+
+/**
+ * Five-card draw: the player to act throws away the cards at `discardIdx`
+ * (positions in their hand) and gets replacements. An empty list stands pat.
+ */
+export function applyDraw(h: HandState, discardIdx: number[]): void {
+  if (h.done || h.street !== 'draw') throw new Error('Not the drawing round');
+  const p = h.players[h.toAct];
+  const idx = [...new Set(discardIdx)].filter((i) => i >= 0 && i < p.hole.length);
+  const thrown = idx.map((i) => p.hole[i]);
+  for (const i of idx) p.hole[i] = drawCard(h);
+  h.muck.push(...thrown);
+  p.hasActed = true;
+  h.actions.push({ seat: p.seat, type: 'draw', amount: idx.length, street: 'draw', allIn: p.allIn });
+  const next = nextSeat(h, p.seat, (o) => inHand(o) && !o.hasActed);
+  if (next === -1 || next === p.seat) advanceDraw(h);
+  else h.toAct = next;
+}
+
 function finish(h: HandState) {
   h.done = true;
   h.toAct = -1;
@@ -344,7 +412,7 @@ function finish(h: HandState) {
     h.pots = [{ amount: total, winners: [w.seat], eligible: [w.seat] }];
   } else {
     // Make sure the board is complete (all-in run-outs are handled in advance())
-    while (h.board.length < 5) {
+    while (h.variant !== 'draw' && h.board.length < 5) {
       h.deck.pop();
       h.board.push(h.deck.pop()!);
     }
@@ -448,6 +516,10 @@ export function describeAction(h: HandState, a: Action): string {
       return `${name} ${v('bet')} ${a.amount}${ai}`;
     case 'raise':
       return `${name} ${v('raise to')} ${a.amount}${ai}`;
+    case 'draw':
+      return a.amount === 0
+        ? `${name} ${p.isHuman ? 'stand' : 'stands'} pat`
+        : `${name} ${v('draw')} ${a.amount} card${a.amount === 1 ? '' : 's'}`;
   }
 }
 

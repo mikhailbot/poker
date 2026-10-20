@@ -3,7 +3,7 @@ import { botAct, createSession, dealNext, DEFAULT_SETTINGS } from '../src/sessio
 import { positionOf } from '../src/engine/game';
 
 const N = Number(process.argv[2] ?? 3000);
-const s = createSession({ ...DEFAULT_SETTINGS, variant: (process.argv[3] ?? 'holdem') as 'holdem' | 'plo' }, 'x', false);
+const s = createSession({ ...DEFAULT_SETTINGS, variant: (process.argv[3] ?? 'holdem') as 'holdem' | 'plo' | 'draw' }, 'x', false);
 let flops = 0, playersOnFlop = 0, walks = 0, bbFacingOpen = 0, bbDefend = 0, cbets = 0, cbetFolds = 0, cbetResponses = 0, facingBet = 0, foldsToBet = 0;
 for (let i = 0; i < N; i++) {
   const h = dealNext(s);

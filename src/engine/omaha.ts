@@ -1,9 +1,9 @@
 import type { Card } from './cards';
 import { evaluate } from './evaluator';
 
-export type Variant = 'holdem' | 'plo';
+export type Variant = 'holdem' | 'plo' | 'draw';
 
-export const HOLE_CARDS: Record<Variant, number> = { holdem: 2, plo: 4 };
+export const HOLE_CARDS: Record<Variant, number> = { holdem: 2, plo: 4, draw: 5 };
 
 const five: Card[] = [0, 0, 0, 0, 0];
 
@@ -33,5 +33,7 @@ export function evaluateOmaha(hole: readonly Card[], board: readonly Card[]): nu
 
 /** Score a player's hand for the given game. */
 export function scoreHand(variant: Variant, hole: readonly Card[], board: readonly Card[]): number {
-  return variant === 'plo' ? evaluateOmaha(hole, board) : evaluate([...hole, ...board]);
+  if (variant === 'plo') return evaluateOmaha(hole, board);
+  if (variant === 'draw') return evaluate(hole); // five-card draw: your five cards are the hand
+  return evaluate([...hole, ...board]);
 }

@@ -1,6 +1,6 @@
 # Card Room
 
-Practise 6-max no-limit hold'em or pot-limit Omaha against bots that play like real people. Single player, runs entirely in the browser, no accounts, no server, no real money. Installable on iPhone as a home-screen app.
+Practise 6-max no-limit hold'em, pot-limit Omaha or five-card draw against bots that play like real people. Single player, runs entirely in the browser, no accounts, no server, no real money. Installable on iPhone as a home-screen app.
 
 ## Run it
 
@@ -37,7 +37,7 @@ Check the styles still hold after changing a profile:
 
 ```bash
 npm run simulate -- 6000       # bot-only hold'em session: VPIP/PFR/3-bet/AF/WTSD/win rate per style
-npm run simulate -- 2000 plo   # same for Omaha
+npm run simulate -- 2000 plo   # same for Omaha (or 'draw')
 npx tsx scripts/bigpots.ts # the biggest pots with each bot's reasoning
 ```
 
@@ -46,7 +46,9 @@ npx tsx scripts/bigpots.ts # the biggest pots with each bot's reasoning
 - **No-limit Hold'em**: two hole cards.
 - **Pot-limit Omaha**: four hole cards, use exactly two plus three from the board; raises capped at the pot. Bots score 4-card starting hands by pairs, suitedness, connectedness and danglers (`src/bots/plo.ts`), widen their ranges, and run Omaha equity simulations postflop.
 
-Switch games from the game button in the top-left.
+- **Five-card draw**: five private cards, no board. Bet, swap any cards once, bet again. Bots draw the standard way (pat with made hands, keep pairs and trips, draw to four-flushes and open-ended straights, sometimes stand pat as a bluff) and read your hand from how many cards you take (`src/bots/draw.ts`). Tap cards to mark them for swapping; a tip shows the usual play.
+
+Tap the game button in the top-left to switch games or pick who's at the table (Lively, Mixed, Tough, Random). Each game keeps its own stacks and stats.
 
 ## Practice features
 
@@ -60,7 +62,7 @@ Switch games from the game button in the top-left.
 ## Layout
 
 ```
-src/engine/   cards, evaluators (hold'em + Omaha), betting rules (no-limit + pot-limit), side pots
+src/engine/   cards, evaluators (hold'em, Omaha, draw), betting rules (no-limit + pot-limit), draw round, side pots
 src/bots/     preflop table, range-aware equity, decision logic, profiles, stats
 src/session.ts  table session: dealing, rebuys, tilt, stats
 src/store/    local storage: session, prefs, hand history

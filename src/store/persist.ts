@@ -41,7 +41,7 @@ export interface HistoryPlayer {
 
 export interface HistoryEntry {
   id: number;
-  variant?: 'holdem' | 'plo';
+  variant?: 'holdem' | 'plo' | 'draw';
   time: number;
   bigBlind: number;
   board: Card[];
@@ -72,15 +72,41 @@ function write(key: string, value: unknown) {
 export const loadPrefs = (): Prefs => ({ ...DEFAULT_PREFS, ...read<Partial<Prefs>>(KEY_PREFS, {}) });
 export const savePrefs = (p: Prefs) => write(KEY_PREFS, p);
 
-/** Persist everything except the hand in progress. */
+type GameId = 'holdem' | 'plo' | 'draw';
+const KEY_CURRENT = 'pt.currentGame.v1';
+const sessionKey = (g: GameId) => `pt.session.${g}.v2`;
+
+/** One saved session per game, so switching games resumes where you left off. */
 export function saveSession(s: Session) {
-  write(KEY_SESSION, { ...s, hand: null, notes: {} });
+  const g = (s.settings.variant ?? 'holdem') as GameId;
+  write(sessionKey(g), { ...s, hand: null, notes: {} });
+  write(KEY_CURRENT, g);
 }
 
-export function loadSession(): Session | null {
-  const s = read<Session | null>(KEY_SESSION, null);
+export function loadCurrentGame(): GameId {
+  const g = read<GameId | null>(KEY_CURRENT, null);
+  if (g) return g;
+  // Older versions kept a single session: carry it over
+  const legacy = read<Session | null>(KEY_SESSION, null);
+  return ((legacy?.settings?.variant as GameId) ?? 'holdem') as GameId;
+}
+
+export function loadSession(game: GameId = loadCurrentGame()): Session | null {
+  let s = read<Session | null>(sessionKey(game), null);
+  if (!s) {
+    const legacy = read<Session | null>(KEY_SESSION, null);
+    if (legacy && (legacy.settings?.variant ?? 'holdem') === game) s = legacy;
+  }
   if (!s || !Array.isArray(s.seats) || s.seats.length !== 6) return null;
   return s;
+}
+
+/** A short summary of a saved game, for the game picker. */
+export function sessionSummary(game: GameId): { hands: number; netBB: number } | null {
+  const s = loadSession(game);
+  if (!s) return null;
+  const hero = s.seats.find((x) => x.isHuman);
+  return { hands: s.handCount, netBB: hero ? (hero.stack - hero.buyIns) / s.settings.bigBlind : 0 };
 }
 
 export const loadHistory = (): HistoryEntry[] => read<HistoryEntry[]>(KEY_HISTORY, []);

@@ -62,7 +62,8 @@ export function recordHand(stats: PlayerStats[], h: HandState): void {
     s.aggActions += post.filter((a) => a.type === 'bet' || a.type === 'raise').length;
     s.passiveActions += post.filter((a) => a.type === 'call').length;
     const foldedPre = mine.some((a) => a.type === 'fold');
-    if (!foldedPre && h.board.length >= 3 && h.actions.some((a) => a.street === 'flop')) s.sawFlop++;
+    // "Saw the flop" (or, in draw, got to the draw): still in after the first betting round
+    if (!foldedPre && h.actions.some((a) => a.street !== 'preflop')) s.sawFlop++;
     const sd = h.showdown.find((x) => x.seat === p.seat);
     if (sd) {
       s.wentToShowdown++;
