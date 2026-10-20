@@ -21,7 +21,7 @@ export const GAMES: { id: Variant; name: string; short: string; cards: number; a
   {
     id: 'draw',
     name: 'Five-card draw',
-    short: 'Draw',
+    short: '5-card draw',
     cards: 5,
     about: 'Five cards each and no board. Bet, swap any cards once, then bet again.',
   },

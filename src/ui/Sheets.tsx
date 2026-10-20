@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { PROFILES } from '../bots/profiles';
 import { pct, type PlayerStats } from '../bots/stats';
 import type { HistoryEntry, Prefs } from '../store/persist';
@@ -202,11 +202,30 @@ export function StatsSheet({ session, onClose }: { session: Session; onClose: ()
 
 interface SettingsProps {
   prefs: Prefs;
+  gameName: string;
   onPrefs: (p: Prefs) => void;
+  onResetGame: () => void;
+  onClearHistory: () => void;
+  onResetAll: () => void;
   onClose: () => void;
 }
 
-export function SettingsSheet({ prefs, onPrefs, onClose }: SettingsProps) {
+/** A destructive button that asks for a second tap instead of a pop-up. */
+function ConfirmButton({ label, confirmLabel, onConfirm }: { label: string; confirmLabel: string; onConfirm: () => void }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button className={`reset-btn ${armed ? 'armed' : ''}`} onClick={() => (armed ? onConfirm() : setArmed(true))}>
+      {armed ? confirmLabel : label}
+    </button>
+  );
+}
+
+export function SettingsSheet({ prefs, gameName, onPrefs, onResetGame, onClearHistory, onResetAll, onClose }: SettingsProps) {
   const toggle = (k: 'showOdds' | 'showChance' | 'revealStyles' | 'revealMucked' | 'autoDeal', label: string, hint: string) => (
     <label className="toggle">
       <span>
@@ -233,6 +252,32 @@ export function SettingsSheet({ prefs, onPrefs, onClose }: SettingsProps) {
       {toggle('revealMucked', 'Show all cards after the hand', 'Reveal the hands of players who folded, so you can see what they had.')}
       {toggle('revealStyles', 'Reveal player styles', 'Label each bot with how it plays. Off is more realistic.')}
       {toggle('autoDeal', 'Deal next hand automatically after you fold', 'Waits a few seconds (longer when cards are shown). Hands you play to the end always wait for you.')}
+      <div className="field">
+        <span>Reset</span>
+        <div className="resets">
+          <div className="reset-row">
+            <div>
+              <b>Restart {gameName}</b>
+              <small>Fresh stacks and stats for this game, same table. Other games and history are kept.</small>
+            </div>
+            <ConfirmButton label="Restart" confirmLabel="Tap to confirm" onConfirm={onResetGame} />
+          </div>
+          <div className="reset-row">
+            <div>
+              <b>Clear hand history</b>
+              <small>Deletes the saved hands. Stacks and stats are kept.</small>
+            </div>
+            <ConfirmButton label="Clear" confirmLabel="Tap to confirm" onConfirm={onClearHistory} />
+          </div>
+          <div className="reset-row">
+            <div>
+              <b>Reset everything</b>
+              <small>All games, stats, history and settings, back to a fresh start.</small>
+            </div>
+            <ConfirmButton label="Reset" confirmLabel="Tap to confirm" onConfirm={onResetAll} />
+          </div>
+        </div>
+      </div>
     </Sheet>
   );
 }

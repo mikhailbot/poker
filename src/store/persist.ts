@@ -111,10 +111,18 @@ export function sessionSummary(game: GameId): { hands: number; netBB: number } |
 
 export const loadHistory = (): HistoryEntry[] => read<HistoryEntry[]>(KEY_HISTORY, []);
 
+export function clearHistory() {
+  try {
+    localStorage.removeItem(KEY_HISTORY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Remove everything this app has saved: every game's session, history, stats and settings. */
 export function clearAll() {
   try {
-    localStorage.removeItem(KEY_SESSION);
-    localStorage.removeItem(KEY_HISTORY);
+    for (const k of Object.keys(localStorage)) if (k.startsWith('pt.')) localStorage.removeItem(k);
   } catch {
     /* ignore */
   }

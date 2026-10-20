@@ -17,6 +17,8 @@ import {
 } from '../session';
 import {
   appendHistory,
+  clearAll,
+  clearHistory,
   loadHistory,
   loadPrefs,
   loadSession,
@@ -177,14 +179,18 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="game-chip" onClick={() => setPanel('games')} aria-label="Choose a game">
-          <span className="game-name">{GAMES.find((g) => g.id === variant)!.short}</span>
-          <span className="game-stakes">
-            {s.settings.smallBlind}/{s.settings.bigBlind}
-          </span>
-          <svg className="chev" viewBox="0 0 12 12" width="10" height="10" aria-hidden>
-            <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <button className="game-chip" onClick={() => setPanel('games')} aria-label="Switch game">
+          <svg className="swap-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden>
+            <path
+              d="M4 7h11m0 0-3-3m3 3-3 3M16 13H5m0 0 3-3m-3 3 3 3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
+          <span className="game-name">{GAMES.find((g) => g.id === variant)!.short}</span>
         </button>
         <button className="session" onClick={() => setPanel('stats')} aria-label="Session stats">
           <span className={`session-net ${net > 0 ? 'up' : net < 0 ? 'down' : ''}`}>
@@ -289,7 +295,29 @@ export function App() {
 
       {panel === 'history' && <HistorySheet history={history} onClose={() => setPanel(null)} />}
       {panel === 'stats' && <StatsSheet session={s} onClose={() => setPanel(null)} />}
-      {panel === 'settings' && <SettingsSheet prefs={prefs} onPrefs={updatePrefs} onClose={() => setPanel(null)} />}
+      {panel === 'settings' && (
+        <SettingsSheet
+          prefs={prefs}
+          gameName={GAMES.find((g) => g.id === variant)!.name}
+          onPrefs={updatePrefs}
+          onResetGame={() => newTable(s.settings.table ?? 'lively')}
+          onClearHistory={() => {
+            clearHistory();
+            setHistory([]);
+            setPanel(null);
+          }}
+          onResetAll={() => {
+            clearAll();
+            setHistory([]);
+            setPrefs(loadPrefs());
+            sessionRef.current = freshSession('holdem', 'lively');
+            saveSession(sessionRef.current);
+            setPanel(null);
+            deal();
+          }}
+          onClose={() => setPanel(null)}
+        />
+      )}
       {panel === 'games' && (
         <GamePicker
           current={variant}

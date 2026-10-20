@@ -118,8 +118,8 @@ input:focus-visible {
 .game-chip {
   justify-self: start;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 7px;
   border: 0;
   background: var(--surface);
   padding: 8px 12px;
@@ -1461,4 +1461,51 @@ button.card {
 .hero-drew {
   color: var(--accent);
   font-weight: 650;
+}
+
+.swap-icon {
+  flex: none;
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------ reset */
+.resets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.reset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 12px;
+}
+.reset-row b {
+  display: block;
+  font-weight: 650;
+}
+.reset-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.reset-btn {
+  flex: none;
+  min-width: 84px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--down);
+  background: transparent;
+  color: var(--down);
+  font-weight: 650;
+  font-size: 13px;
+}
+.reset-btn.armed {
+  background: var(--down);
+  color: #fff;
 }
