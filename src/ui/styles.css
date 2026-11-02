@@ -1848,3 +1848,8 @@ button.card {
 .opp {
   padding: 6px 2px 5px;
 }
+
+.news {
+  font-size: 14px;
+  opacity: 0.9;
+}

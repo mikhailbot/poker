@@ -61,7 +61,7 @@ export function Table({ session, revealStyles, revealMucked, thinking, selected,
   return (
     <div className={`table is-${h.variant}`}>
       <Opponents h={h} session={session} revealStyles={revealStyles} revealMucked={revealMucked} thinking={thinking} />
-      <Stage h={h} revealMucked={revealMucked} selected={selected} onToggle={onToggle} />
+      <Stage h={h} revealMucked={revealMucked} selected={selected} onToggle={onToggle} news={session.tableNews} />
       <Hero h={h} />
     </div>
   );
@@ -137,11 +137,13 @@ function Stage({
   revealMucked,
   selected,
   onToggle,
+  news,
 }: {
   h: HandState;
   revealMucked: boolean;
   selected?: Set<number>;
   onToggle?: (index: number) => void;
+  news?: string[];
 }) {
   const last = [...h.actions].reverse().find((a) => a.type !== 'post');
   const pot = h.done ? h.pots.reduce((s, p) => s + p.amount, 0) : potTotal(h);
@@ -175,7 +177,15 @@ function Stage({
       </div>
       <div className="ticker" aria-live="polite" ref={tickerRef} onScroll={checkOverflow}>
         <div className="ticker-inner">
-          {h.done ? <Result h={h} revealMucked={revealMucked} /> : last ? describeAction(h, last) : `Blinds ${h.smallBlind}/${h.bigBlind}`}
+          {h.done ? (
+            <Result h={h} revealMucked={revealMucked} />
+          ) : last ? (
+            describeAction(h, last)
+          ) : news?.length ? (
+            <span className="news">{news.join(' ')}</span>
+          ) : (
+            `Blinds ${h.smallBlind}/${h.bigBlind}`
+          )}
         </div>
       </div>
     </section>

@@ -55,6 +55,8 @@ export interface Session {
   hand: HandState | null;
   /** Bot reasoning for the current hand, per action index. */
   notes: Record<number, string>;
+  /** Players who left or sat down before this hand, shown on the table. */
+  tableNews?: string[];
 }
 
 function shuffle<T>(xs: T[]): T[] {
@@ -91,17 +93,36 @@ export function createSession(settings: Settings = DEFAULT_SETTINGS, humanName =
   };
 }
 
-/** Bots reload when short; returns names of bots that rebought. */
+/** A bot that runs its stack up past this many buy-ins leaves, and a new player sits down. */
+const LEAVE_AT_BUYINS = 3;
+
+/**
+ * Between hands: short bots reload, and big winners leave the table (as real players do)
+ * with a newcomer taking the seat at a normal stack. Without this, chips pile up with a few
+ * bots and stacks get unrealistically deep, which makes pots enormous.
+ */
 function topUpBots(s: Session) {
   const full = s.settings.buyInBB * s.settings.bigBlind;
-  for (const seat of s.seats) {
-    if (seat.isHuman) continue;
+  s.tableNews = [];
+  s.seats.forEach((seat, i) => {
+    if (seat.isHuman) return;
+    if (seat.stack > full * LEAVE_AT_BUYINS) {
+      const taken = new Set(s.seats.map((x) => x.name));
+      const name = shuffle(BOT_NAMES).find((n) => !taken.has(n)) ?? seat.name;
+      s.tableNews!.push(`${seat.name} left up ${Math.round((seat.stack - seat.buyIns) / s.settings.bigBlind)} BB. ${name} sat down.`);
+      seat.name = name;
+      seat.stack = full;
+      seat.buyIns = full;
+      seat.tilt = 0;
+      s.stats[i] = emptyStats(); // a new player: the old reads don't apply
+      return;
+    }
     if (seat.stack < full * 0.4) {
       const add = full - seat.stack;
       seat.stack += add;
       seat.buyIns += add;
     }
-  }
+  });
 }
 
 export function canDeal(s: Session) {
