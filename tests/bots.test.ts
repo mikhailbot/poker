@@ -74,7 +74,8 @@ describe('full bot sessions', () => {
     }
     const inPlay = s.seats.reduce((a, x) => a + x.stack, 0);
     const bought = s.seats.reduce((a, x) => a + x.buyIns, 0);
-    expect(inPlay).toBeLessThanOrEqual(bought + 1); // chips only move between players
-    expect(s.seats.reduce((a, x) => a + (x.stack - x.buyIns), 0)).toBe(0);
+    expect(inPlay).toBeLessThanOrEqual(bought + 1 - (s.cashedOut ?? 0)); // chips only move between players
+    // Every chip won is either still on the table or left with a player who cashed out
+    expect(s.seats.reduce((a, x) => a + (x.stack - x.buyIns), 0) + (s.cashedOut ?? 0)).toBe(0);
   }, 60000);
 });

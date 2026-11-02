@@ -96,17 +96,19 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
     return fold('short stack, not strong enough to shove');
   }
 
-  const openPct = clamp((p.pfr / 100) * mult * wide, 0.02, 0.85);
+  // Omaha: play more hands, but raise only a bit more often (people limp and call a lot in PLO)
+  const raiseWide = h.variant === 'plo' ? 1.15 : 1;
+  const openPct = clamp((p.pfr / 100) * mult * raiseWide * 0.85, 0.02, 0.85);
   const playPct = clamp((p.vpip / 100) * mult * wide, openPct, 0.95);
 
   if (raises === 0) {
     if (pos === 'BB') {
       // Limped pot or walk
-      if (la.canRaise && hp <= jitter(openPct * 0.45)) return raiseTo(bb * (3 + limpers), 'raises the limpers');
+      if (la.canRaise && hp <= jitter(openPct * 0.35)) return raiseTo(bb * (3 + limpers), 'raises the limpers');
       return call('checks the option');
     }
     if (limpers > 0) {
-      if (la.canRaise && hp <= jitter(openPct * 0.75)) return raiseTo(bb * (p.openSize + 1 + limpers), 'isolation raise');
+      if (la.canRaise && hp <= jitter(openPct * 0.5)) return raiseTo(bb * (p.openSize + 1 + limpers), 'isolation raise');
       if (hp <= jitter(playPct * (pos === 'SB' ? 1.1 : 0.9))) return call('over-limps');
       return fold('folds to the limp');
     }
@@ -133,9 +135,9 @@ function preflop(h: HandState, seat: number, p: Profile, ctx: BotContext): BotCh
   const toCallFrac = la.callAmount / (me.stack + 1);
 
   if (raises === 1) {
-    const threeBetPct = clamp(((p.threeBet * wide) / 100) * (pos === 'BTN' || pos === 'SB' || pos === 'BB' ? 1.2 : 0.9), 0.015, 0.4);
+    const threeBetPct = clamp(((p.threeBet * raiseWide * 0.75) / 100) * (pos === 'BTN' || pos === 'SB' || pos === 'BB' ? 1.2 : 0.9), 0.012, 0.3);
     // value range scales with how wide the raiser is
-    const valueLine = threeBetPct * clamp(raiserRange / 0.2, 0.6, 1.8);
+    const valueLine = threeBetPct * clamp(raiserRange / 0.2, 0.6, 1.3);
     if (la.canRaise && hp <= jitter(valueLine)) {
       const ip = pos !== 'SB' && pos !== 'BB';
       return raiseTo(h.currentBet * (ip ? 3 : 3.8) + callers * h.currentBet, '3-bets');

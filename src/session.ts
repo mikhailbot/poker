@@ -27,6 +27,8 @@ export interface Settings {
   table?: TableKind;
   /** Five-card draw: number of draws per hand (1-3). */
   draws?: number;
+  /** Keep the same players seated (used by simulations that measure each style). */
+  noLeaving?: boolean;
 }
 
 /** Table line-ups: which five personalities sit with you. */
@@ -57,6 +59,8 @@ export interface Session {
   notes: Record<number, string>;
   /** Players who left or sat down before this hand, shown on the table. */
   tableNews?: string[];
+  /** Net chips taken away by players who left the table (keeps the books balanced). */
+  cashedOut?: number;
 }
 
 function shuffle<T>(xs: T[]): T[] {
@@ -106,10 +110,11 @@ function topUpBots(s: Session) {
   s.tableNews = [];
   s.seats.forEach((seat, i) => {
     if (seat.isHuman) return;
-    if (seat.stack > full * LEAVE_AT_BUYINS) {
+    if (!s.settings.noLeaving && seat.stack > full * LEAVE_AT_BUYINS) {
       const taken = new Set(s.seats.map((x) => x.name));
       const name = shuffle(BOT_NAMES).find((n) => !taken.has(n)) ?? seat.name;
       s.tableNews!.push(`${seat.name} left up ${Math.round((seat.stack - seat.buyIns) / s.settings.bigBlind)} BB. ${name} sat down.`);
+      s.cashedOut = (s.cashedOut ?? 0) + (seat.stack - seat.buyIns);
       seat.name = name;
       seat.stack = full;
       seat.buyIns = full;
